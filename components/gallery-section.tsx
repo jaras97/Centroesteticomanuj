@@ -239,7 +239,7 @@ export default function GallerySection() {
           close={() => setLightboxIndex(null)}
           index={Math.min(lightboxIndex, slides.length - 1)}
           slides={slides}
-          plugins={[Thumbnails, Zoom, Fullscreen, Captions]}
+          plugins={[Thumbnails, Zoom, Fullscreen]}
           animation={{ fade: 300, swipe: 300 }}
           carousel={{ finite: false, imageFit: 'contain' }}
           controller={{ closeOnBackdropClick: true }}
