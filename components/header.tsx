@@ -149,7 +149,7 @@ export default function Header() {
             </div>
             <AnimatedButton
               label='Reservar cita'
-              phone='+573147768649'
+              phone='+573132146938'
               message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
             />
           </motion.div>

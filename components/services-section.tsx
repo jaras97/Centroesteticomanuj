@@ -51,11 +51,7 @@ const services = [
       'Eliminan tensiones profundas y alivian dolores musculares causados por el estrés o esfuerzo físico.',
     image: '/masaje2.jpeg',
     icon: Users,
-    features: [
-      'Descuentos grupales',
-      'Servicio a domicilio',
-      'Coordinación de horarios',
-    ],
+    features: ['enfoque en espalda', 'duración de 60min '],
   },
   {
     id: 5,
@@ -100,9 +96,9 @@ const services = [
     image: '/labios.jpeg',
     icon: Users,
     features: [
-      'Descuentos grupales',
-      'Servicio a domicilio',
-      'Coordinación de horarios',
+      'duración de 1 mes ',
+      'uso de dr-pen',
+      'aplicación de color (opcional)',
     ],
   },
 ];
@@ -208,7 +204,7 @@ export default function ServicesSection() {
                       <AnimatedButton
                         label='Reservar Ahora'
                         href='#contacto'
-                        phone='+573147768649'
+                        phone='+573132146938'
                         message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
                       />
                     </div>

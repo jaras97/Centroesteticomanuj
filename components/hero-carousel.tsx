@@ -134,7 +134,7 @@ export default function HeroCarousel() {
                     <AnimatedButton
                       label='Reservar cita'
                       href='#contacto'
-                      phone='+573147768649'
+                      phone='+573132146938'
                       message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
                     />
                   </motion.div>
