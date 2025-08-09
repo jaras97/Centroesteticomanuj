@@ -232,11 +232,11 @@ export default function GallerySection() {
       </div>
 
       {/* Lightbox */}
-      {lightboxIndex !== null && slides.length > 0 && (
+      {lightboxIndex !== null && slides?.length > 0 && (
         <Lightbox
           open
           close={() => setLightboxIndex(null)}
-          index={Math.min(lightboxIndex, slides.length - 1)}
+          index={lightboxIndex}
           slides={slides}
           plugins={[Thumbnails, Zoom, Fullscreen]}
           animation={{ fade: 300, swipe: 300 }}
