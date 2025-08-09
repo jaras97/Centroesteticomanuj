@@ -146,6 +146,14 @@ export default function Header() {
               >
                 <DynamicIcon name='instagram' size={24} />
               </Link>
+              <Link
+                href='https://www.facebook.com/share/16NsUkTiZN/?mibextid=wwXIfr'
+                target='_blank'
+                rel='noopener noreferrer'
+                className='text-brand-gold hover:text-brand-brown'
+              >
+                <DynamicIcon name='facebook' size={24} />
+              </Link>
             </div>
             <AnimatedButton
               label='Reservar cita'
