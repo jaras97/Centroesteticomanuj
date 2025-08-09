@@ -15,7 +15,7 @@ export default function Footer() {
   return (
     <footer id='contacto' className='bg-black text-white'>
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16'>
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8'>
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8'>
           {/* Company Info */}
           <div className='lg:col-span-2'>
             <div className='mb-6'>
@@ -29,10 +29,7 @@ export default function Footer() {
                 />
               </h3>
               <p className='text-gray-300 leading-relaxed mb-6'>
-                Tu belleza es nuestra pasión. Ofrecemos servicios de maquillaje
-                profesional para hacer que cada momento especial sea
-                inolvidable. Contáctanos para descubrir cómo podemos realzar tu
-                belleza natural.
+                “Más que un servicio, te brindo una experiencia”
               </p>
             </div>
 
@@ -40,15 +37,15 @@ export default function Footer() {
             <div className='space-y-4'>
               <div className='flex items-center space-x-3'>
                 <Phone className='h-5 w-5 text-brand-gold' />
-                <span>+1 (555) 123-4567</span>
+                <span>+57 (313) 214-6938</span>
               </div>
               <div className='flex items-center space-x-3'>
                 <Mail className='h-5 w-5 text-brand-gold' />
-                <span>info@bellamakeup.com</span>
+                <span>centroesteticomanuj@gmail.com</span>
               </div>
               <div className='flex items-center space-x-3'>
                 <MapPin className='h-5 w-5 text-brand-gold' />
-                <span>123 Beauty Street, Ciudad, País</span>
+                <span>Chigorodo, Ant</span>
               </div>
             </div>
           </div>
@@ -89,33 +86,7 @@ export default function Footer() {
                   Nosotros
                 </Link>
               </li>
-              <li>
-                <Link
-                  href='#contacto'
-                  className='text-gray-300 hover:text-brand-gold transition-colors'
-                >
-                  Contacto
-                </Link>
-              </li>
             </ul>
-          </div>
-
-          {/* Newsletter */}
-          <div>
-            <h4 className='text-lg font-semibold mb-6'>Newsletter</h4>
-            <p className='text-gray-300 mb-4'>
-              Suscríbete para recibir tips de belleza y ofertas especiales.
-            </p>
-            <div className='space-y-3'>
-              <Input
-                type='email'
-                placeholder='Tu email'
-                className='bg-gray-800 border-gray-700 text-white placeholder-gray-400'
-              />
-              <Button className='w-full bg-gradient-to-r from-brand-gold to-brand-brown hover:from-brand-gold-dark hover:to-brand-brown-dark'>
-                Suscribirse
-              </Button>
-            </div>
           </div>
         </div>
 
@@ -143,7 +114,7 @@ export default function Footer() {
               </Link>
             </div>
             <div className='text-gray-400 text-sm'>
-              © 2024 Bella Makeup. Todos los derechos reservados.
+              © 2025 Centro Estetico ManuJ. Todos los derechos reservados.
             </div>
           </div>
         </div>

@@ -1,0 +1,1 @@
+export const EASE_OUT: [number, number, number, number] = [0.25, 0.1, 0.25, 1];

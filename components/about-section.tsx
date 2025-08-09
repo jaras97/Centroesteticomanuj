@@ -1,116 +1,221 @@
-import Image from "next/image"
-import { Award, Users, Clock, Heart } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
+'use client';
 
-const stats = [
-  {
-    icon: Users,
-    number: "500+",
-    label: "Clientas Satisfechas",
-  },
-  {
-    icon: Award,
-    number: "5+",
-    label: "Años de Experiencia",
-  },
-  {
-    icon: Clock,
-    number: "1000+",
-    label: "Horas de Trabajo",
-  },
-  {
-    icon: Heart,
-    number: "100%",
-    label: "Dedicación",
-  },
-]
+import Image from 'next/image';
+import { motion, useReducedMotion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
+import { Card, CardContent } from '@/components/ui/card';
+import AnimatedButton from './ui/AnimatedButton';
 
-const team = [
-  {
-    name: "María González",
-    role: "Maquilladora Principal & Fundadora",
-    image: "/placeholder.svg?height=300&width=300",
-    description:
-      "Especialista en maquillaje nupcial y social con más de 5 años de experiencia. Certificada en técnicas internacionales de maquillaje.",
+const founder = {
+  name: 'Manuela Jaramillo',
+  roles: [
+    'Fundadora',
+    'Maquilladora profesional',
+    'Especialista en maquillaje artístico',
+    'Terapias y bienestar corporal',
+    'Facial',
+  ],
+  image: ['/fundadora.jpeg', '/fundadora2.jpeg'],
+  highlights: ['2+ años de experiencia', '100+ clientas atendidas'],
+  bio: 'Soy una cosmetóloga y maquilladora apasionada, con experiencia y capacitación en tratamientos faciales y corporales, maquillaje social, de novias, quinceañeras, editorial y artístico. Mi enfoque está en realzar la belleza de cada cliente, brindándoles una experiencia satisfactoria y personalizada.',
+};
+
+// Easing cubic-bezier (equivalente a easeOut)
+const EASE_OUT: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+// Variants (duraciones aumentadas)
+const container: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 1.2, ease: EASE_OUT }, // antes 0.9
   },
-  {
-    name: "Ana Rodríguez",
-    role: "Especialista en Maquillaje Artístico",
-    image: "/placeholder.svg?height=300&width=300",
-    description:
-      "Experta en maquillaje editorial y artístico. Formada en las mejores academias de belleza con enfoque en tendencias vanguardistas.",
+};
+
+const stagger: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.75 } }, // antes 0.6
+};
+
+const item: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.9, ease: EASE_OUT }, // antes 0.6
   },
-]
+};
 
 export default function AboutSection() {
+  const shouldReduce = useReducedMotion();
+
   return (
-    <section id="nosotros" className="py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id='nosotros' className='py-20 bg-white'>
+      <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
         {/* Header */}
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-brand-gold to-brand-brown bg-clip-text text-transparent">
+        <motion.div
+          initial='hidden'
+          whileInView='show'
+          viewport={{ once: true, amount: 0.3 }}
+          variants={container}
+          className='text-center mb-16'
+        >
+          <motion.h2
+            variants={item}
+            className='text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-brand-gold to-brand-brown bg-clip-text text-transparent'
+          >
             Sobre Nosotros
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Somos un equipo apasionado de profesionales dedicados a realzar la belleza natural de cada persona. Nuestra
-            misión es hacer que te sientas radiante y segura en cada ocasión especial.
-          </p>
-        </div>
+          </motion.h2>
+          <motion.p
+            variants={item}
+            className='text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed'
+          >
+            En nuestro centro estético realzamos la belleza única de cada
+            persona a través de técnicas innovadoras de maquillaje y
+            cosmetología, fusionando arte, ciencia y cuidado personalizado.
+            Brindamos experiencias transformadoras que inspiran confianza,
+            elevan la autoestima y promueven el bienestar integral. Nos
+            destacamos por la excelencia profesional, el uso de productos de
+            alta calidad y la pasión creativa que nos impulsa a ser tu primera
+            elección en estética, fomentando una belleza saludable y
+            responsable.
+          </motion.p>
+        </motion.div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-20">
-          {stats.map((stat, index) => {
-            const IconComponent = stat.icon
-            return (
-              <div key={index} className="text-center">
-                <div className="bg-gradient-to-br from-amber-100 to-amber-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                  <IconComponent className="h-8 w-8 text-brand-gold" />
-                </div>
-                <div className="text-3xl font-bold text-gray-800 mb-2">{stat.number}</div>
-                <div className="text-gray-600 font-medium">{stat.label}</div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Mission Statement */}
-        <div className="bg-gradient-to-br from-amber-50 to-white rounded-3xl p-8 md:p-12 mb-20">
-          <div className="max-w-4xl mx-auto text-center">
-            <h3 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800">Nuestra Filosofía</h3>
-            <p className="text-lg text-gray-600 leading-relaxed mb-6">
-              Creemos que cada persona tiene una belleza única que merece ser celebrada. Nuestro enfoque personalizado
-              nos permite crear looks que no solo realzan tus características naturales, sino que también reflejan tu
-              personalidad y estilo individual.
-            </p>
-            <p className="text-lg text-gray-600 leading-relaxed">
-              Utilizamos únicamente productos de alta calidad y técnicas profesionales para garantizar resultados
-              duraderos y espectaculares. Tu satisfacción y confianza son nuestra mayor recompensa.
-            </p>
-          </div>
-        </div>
-
-        {/* Team */}
         <div>
-          <h3 className="text-3xl font-bold text-center mb-12 text-gray-800">Nuestro Equipo</h3>
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {team.map((member, index) => (
-              <Card
-                key={index}
-                className="overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-shadow duration-300"
-              >
-                <div className="relative h-64">
-                  <Image src={member.image || "/placeholder.svg"} alt={member.name} fill className="object-cover" />
+          <motion.h2
+            initial='hidden'
+            whileInView='show'
+            viewport={{ once: true, amount: 0.3 }}
+            variants={item}
+            className='text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-brand-gold to-brand-brown bg-clip-text text-transparent text-center'
+          >
+            Conoce a la fundadora
+          </motion.h2>
+
+          <motion.div
+            initial='hidden'
+            whileInView='show'
+            viewport={{ once: true, amount: 0.3 }}
+            variants={container}
+            className='max-w-3xl mx-auto'
+          >
+            <Card className='overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-shadow duration-500'>
+              {/* Collage de imágenes (1 en mobile / 2 en desktop) */}
+              <div className='grid grid-cols-1 md:grid-cols-2 h-80'>
+                {[founder.image[0], founder.image[1]].map((src, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, scale: 0.97, y: 8 }}
+                    whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.4 }}
+                    transition={{
+                      duration: 0.8, // antes 0.45
+                      ease: EASE_OUT,
+                      delay: i * 0.15, // antes 0.08
+                    }}
+                    className={
+                      i === 1 ? 'relative hidden md:block' : 'relative'
+                    }
+                    whileHover={shouldReduce ? {} : { scale: 1.015, y: -3 }}
+                  >
+                    <Image
+                      src={src || '/placeholder.svg'}
+                      alt={i === 0 ? founder.name : 'Trabajo de maquillaje'}
+                      fill
+                      className='object-cover'
+                      priority={i === 0}
+                    />
+                    {/* Overlay sutil al hover */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      whileHover={shouldReduce ? {} : { opacity: 0.08 }}
+                      transition={{ duration: 0.25 }}
+                      className='absolute inset-0 bg-black'
+                    />
+                  </motion.div>
+                ))}
+              </div>
+
+              <CardContent className='p-6 flex flex-col'>
+                <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3'>
+                  <motion.h4
+                    initial={{ opacity: 0, y: 10 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.8, ease: EASE_OUT }} // antes 0.35
+                    className='text-2xl font-bold text-gray-800'
+                  >
+                    {founder.name}
+                  </motion.h4>
+
+                  {/* Roles con stagger más pausado */}
+                  <motion.div
+                    initial='hidden'
+                    whileInView='show'
+                    viewport={{ once: true }}
+                    variants={stagger}
+                    className='flex flex-wrap gap-2'
+                  >
+                    {founder.roles.map((r) => (
+                      <motion.span
+                        key={r}
+                        variants={item}
+                        className='inline-flex items-center rounded-full bg-amber-50 text-brand-brown border border-amber-200 px-3 py-1 text-xs font-semibold'
+                        whileHover={shouldReduce ? {} : { y: -2 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        {r}
+                      </motion.span>
+                    ))}
+                  </motion.div>
                 </div>
-                <CardContent className="p-6">
-                  <h4 className="text-xl font-bold mb-2 text-gray-800">{member.name}</h4>
-                  <p className="text-brand-gold font-semibold mb-4">{member.role}</p>
-                  <p className="text-gray-600 leading-relaxed">{member.description}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+
+                {/* Highlights */}
+                <motion.ul
+                  initial='hidden'
+                  whileInView='show'
+                  viewport={{ once: true }}
+                  variants={stagger}
+                  className='flex flex-wrap gap-4 mb-4 text-sm text-gray-700'
+                >
+                  {founder.highlights.map((h) => (
+                    <motion.li
+                      key={h}
+                      variants={item}
+                      className='flex items-center gap-2'
+                    >
+                      <span className='w-1.5 h-1.5 rounded-full bg-brand-gold' />
+                      {h}
+                    </motion.li>
+                  ))}
+                </motion.ul>
+
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, ease: EASE_OUT, delay: 0.08 }} // antes 0.35
+                  className='text-gray-600 leading-relaxed mb-6'
+                >
+                  {founder.bio}
+                </motion.p>
+
+                {/* CTAs con microinteracciones más suaves */}
+                <div className='mt-auto grid grid-cols-1  gap-3'>
+                  <AnimatedButton
+                    label='Reservar cita'
+                    href='#contacto'
+                    phone='+573147768649'
+                    message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
       </div>
     </section>
-  )
+  );
 }

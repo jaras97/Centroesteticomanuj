@@ -6,6 +6,9 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'centro estetico manuj',
   description: 'Maquilladora y cosmetóloga profesional',
+  icons: {
+    icon: '/isologo.svg',
+  },
 };
 
 export default function RootLayout({
@@ -14,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='en' translate='no'>
+    <html lang='en' translate='no' className='scroll-smooth'>
       <head>
         <meta name='google' content='notranslate' />
         <style>{`
