@@ -5,7 +5,6 @@ import { Sparkles, Heart, Camera, Users } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import AnimatedButton from './ui/AnimatedButton';
 
 const services = [
@@ -103,23 +102,23 @@ const services = [
   },
 ];
 
-// easing cubic-bezier (equivalente a easeOut)
-const EASE_OUT: [number, number, number, number] = [0.16, 1, 0.3, 1];
+// easing cubic-bezier (equivalente a easeOut) — tipado como tupla literal
+const EASE_OUT = [0.16, 1, 0.3, 1] as const;
 
 // Variants
 const headerContainer: Variants = {
   hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 2, ease: EASE_OUT } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE_OUT } },
 };
 
-const gridStagger: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.2 } },
-};
-
+// Cada card controla su entrada con delay por índice (custom)
 const cardItem: Variants = {
-  hidden: { opacity: 0, y: 18 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE_OUT } },
+  hidden: { opacity: 0, y: 22 },
+  show: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.55, ease: EASE_OUT, delay: i * 0.08 },
+  }),
 };
 
 export default function ServicesSection() {
@@ -132,7 +131,7 @@ export default function ServicesSection() {
         <motion.div
           initial='hidden'
           whileInView='show'
-          viewport={{ once: true, amount: 0.9 }}
+          viewport={{ once: true, amount: 0.35 }}
           variants={headerContainer}
           className='text-center mb-16'
         >
@@ -147,22 +146,20 @@ export default function ServicesSection() {
           </p>
         </motion.div>
 
-        {/* Grid con stagger */}
-        <motion.div
-          className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8'
-          initial='hidden'
-          whileInView='show'
-          viewport={{ once: true, amount: 0.15 }}
-          variants={gridStagger}
-        >
-          {services.map((service) => {
+        {/* Grid — sin orquestación global; cada card se anima al entrar */}
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8'>
+          {services.map((service, idx) => {
             const IconComponent = service.icon;
             return (
               <motion.div
                 key={service.id}
                 variants={cardItem}
+                custom={idx} // delay incremental por índice
+                initial='hidden'
+                whileInView='show'
+                viewport={{ once: true, amount: 0.3 }}
                 whileHover={reduce ? {} : { y: -4 }}
-                transition={{ duration: 0.2, ease: EASE_OUT }}
+                transition={{ duration: 0.25, ease: EASE_OUT }}
                 className='h-full'
               >
                 <Card className='group hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br from-amber-50 to-white overflow-hidden h-full flex flex-col'>
@@ -213,7 +210,7 @@ export default function ServicesSection() {
               </motion.div>
             );
           })}
-        </motion.div>
+        </div>
       </div>
     </section>
   );

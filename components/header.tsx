@@ -198,9 +198,11 @@ export default function Header() {
                     <span className='text-sm'>+57 (313) 214-6938</span>
                   </div>
                   <motion.div variants={mobileItem} custom={navigation.length}>
-                    <Button className='w-full bg-gradient-to-r from-brand-gold to-brand-brown hover:from-brand-gold-dark hover:to-brand-brown-dark'>
-                      Reservar Cita
-                    </Button>
+                    <AnimatedButton
+                      label='Reservar cita'
+                      phone='+573132146938'
+                      message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
+                    />
                   </motion.div>
                 </div>
               </nav>

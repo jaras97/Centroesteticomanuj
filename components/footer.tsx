@@ -95,6 +95,12 @@ export default function Footer() {
               >
                 <DynamicIcon name='instagram' size={24} />
               </Link>
+              {/* <Link
+                href='#'
+                className='text-gray-400 hover:text-brand-gold transition-colors'
+              >
+                <Facebook className='h-6 w-6' />
+              </Link> */}
             </div>
             <div className='text-gray-400 text-sm'>
               © 2025 Centro Estetico ManuJ. Todos los derechos reservados.
