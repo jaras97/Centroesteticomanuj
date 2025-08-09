@@ -114,7 +114,6 @@ export default function GallerySection() {
   const [selectedCategory, setSelectedCategory] = useState<Category>('Todos');
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  // Filtrado por categoría
   const filteredImages = useMemo(
     () =>
       selectedCategory === 'Todos'
@@ -123,7 +122,6 @@ export default function GallerySection() {
     [selectedCategory],
   );
 
-  // Slides para YARL (incluimos title/description para captions)
   const slides = useMemo(
     () =>
       filteredImages.map((img) => ({
@@ -149,16 +147,7 @@ export default function GallerySection() {
           variants={headerVariants}
           className='text-center mb-16'
         >
-          <h2 className='text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-brand-gold to-brand-brown bg-clip-text text-transparent'>
-            Galería de Trabajos
-          </h2>
-          <p className='text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-8'>
-            Explora nuestra colección de trabajos realizados. Cada imagen
-            representa nuestro compromiso con la excelencia y la belleza
-            personalizada.
-          </p>
-
-          {/* Filtros */}
+          {/* ... */}
           <div className='flex flex-wrap justify-center gap-2'>
             {categories.map((c) => {
               const active = selectedCategory === c;
@@ -167,8 +156,7 @@ export default function GallerySection() {
                   key={c}
                   onClick={() => {
                     setSelectedCategory(c);
-                    // Reinicia el índice del lightbox al cambiar de categoría
-                    setLightboxIndex(null);
+                    setLightboxIndex(null); // cerrar visor por si acaso
                   }}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                     active
@@ -183,12 +171,12 @@ export default function GallerySection() {
           </div>
         </motion.div>
 
-        {/* Grid con reveal + hover sutil */}
+        {/* Grid (clave: key + animate) */}
         <motion.div
+          key={selectedCategory} // 👈 reinicia animación al cambiar filtro
           className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
           initial='hidden'
-          whileInView='show'
-          viewport={{ once: true, amount: 0.15 }}
+          animate='show' // 👈 en vez de whileInView
           variants={gridStagger}
         >
           {filteredImages.map((image) => (
@@ -219,18 +207,25 @@ export default function GallerySection() {
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Fallback opcional si no hay imágenes */}
+        {filteredImages.length === 0 && (
+          <p className='text-center text-gray-500 mt-8'>
+            No hay imágenes en esta categoría.
+          </p>
+        )}
       </div>
 
-      {/* Lightbox PRO (YARL) */}
-      {lightboxIndex !== null && (
+      {/* Lightbox: agrega guardas */}
+      {lightboxIndex !== null && slides.length > 0 && (
         <Lightbox
           open
           close={() => setLightboxIndex(null)}
-          index={lightboxIndex}
+          index={Math.min(lightboxIndex, slides.length - 1)} // 👈 evita out-of-range
           slides={slides}
           plugins={[Thumbnails, Zoom, Fullscreen]}
           animation={{ fade: 300, swipe: 300 }}
-          carousel={{ finite: false, imageFit: 'contain' }} // 👈 clave
+          carousel={{ finite: false, imageFit: 'contain' }}
           controller={{ closeOnBackdropClick: true }}
           styles={{
             container: { backgroundColor: 'rgba(0,0,0,0.9)' },
@@ -238,9 +233,9 @@ export default function GallerySection() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-            }, // 👈 centrado
+            },
           }}
-          thumbnails={{ position: 'bottom' }} // evita empujes laterales en mobile
+          thumbnails={{ position: 'bottom' }}
         />
       )}
     </section>

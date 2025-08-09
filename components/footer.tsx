@@ -1,13 +1,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-  Phone,
-  Mail,
-  MapPin,
-  Instagram,
-  Facebook,
-  Twitter,
-} from 'lucide-react';
+import { Phone, Mail, MapPin } from 'lucide-react';
+
+import { DynamicIcon } from 'lucide-react/dynamic';
 
 export default function Footer() {
   return (
@@ -93,22 +88,12 @@ export default function Footer() {
           <div className='flex flex-col md:flex-row justify-between items-center'>
             <div className='flex space-x-6 mb-4 md:mb-0'>
               <Link
-                href='#'
-                className='text-gray-400 hover:text-brand-gold transition-colors'
+                href='https://www.instagram.com/centroestetico_manuj?igsh=cmRoaWd3aXljYjE%3D&utm_source=qr'
+                target='_blank'
+                rel='noopener noreferrer'
+                className='text-brand-gold hover:text-brand-brown'
               >
-                <Instagram className='h-6 w-6' />
-              </Link>
-              <Link
-                href='#'
-                className='text-gray-400 hover:text-brand-gold transition-colors'
-              >
-                <Facebook className='h-6 w-6' />
-              </Link>
-              <Link
-                href='#'
-                className='text-gray-400 hover:text-brand-gold transition-colors'
-              >
-                <Twitter className='h-6 w-6' />
+                <DynamicIcon name='instagram' size={24} />
               </Link>
             </div>
             <div className='text-gray-400 text-sm'>
