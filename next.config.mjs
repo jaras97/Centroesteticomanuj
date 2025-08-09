@@ -8,6 +8,9 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+     remotePatterns: [
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
+    ],
   },
    webpack: (config, { isServer }) => {
     if (!isServer) {

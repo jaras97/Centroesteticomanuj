@@ -21,7 +21,8 @@ type Slide = {
 const slides: Slide[] = [
   {
     id: 1,
-    image: '/artistico.jpeg',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769880/artistico_rqsquf.jpg',
     title: 'Maquillaje Profesional',
     description:
       'Servicio de maquillaje profesional para eventos especiales, bodas, grados, cumpleaños, sesiones fotográficas, etc.',
@@ -29,14 +30,16 @@ const slides: Slide[] = [
   },
   {
     id: 2,
-    image: '/labios.jpeg',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769880/labios_nilxgu.jpg',
     title: 'HIDRALIPS',
     description: 'Regenera, repara y revitaliza tus labios con Hidralips.',
     cta: 'Reservar Cita',
   },
   {
     id: 3,
-    image: '/cosme.jpeg',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754770398/cosme_v48p1n.jpg',
     title: 'Tratamientos faciales',
     description:
       'Cuidan y mejoran la piel del rostro, limpiando, hidratando y rejuveneciendo su apariencia.',

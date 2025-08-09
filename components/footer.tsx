@@ -14,7 +14,7 @@ export default function Footer() {
             <div className='mb-6'>
               <h3 className='text-2xl font-bold bg-gradient-to-r from-brand-gold to-amber-300 bg-clip-text text-transparent mb-4'>
                 <Image
-                  src='/isologo.svg'
+                  src='https://res.cloudinary.com/dcuethtco/image/upload/v1754769881/isologo_dhkiyh.svg'
                   alt='Logo'
                   width={150}
                   height={50}

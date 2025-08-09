@@ -97,7 +97,7 @@ export default function Header() {
               className='text-2xl font-bold bg-gradient-to-r from-brand-gold to-brand-brown bg-clip-text text-transparent'
             >
               <Image
-                src='/isologo.svg'
+                src='https://res.cloudinary.com/dcuethtco/image/upload/v1754769881/isologo_dhkiyh.svg'
                 alt='Logo'
                 width={150}
                 height={50}

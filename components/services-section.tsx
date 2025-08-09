@@ -13,7 +13,8 @@ const services = [
     title: 'Maquillaje social',
     description:
       'Perfecto para eventos, fiestas y ocasiones especiales. Adaptamos el look a tu estilo y personalidad',
-    image: '/maquillaje.jpeg',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769880/maquillaje_kv4dw8.jpg',
     icon: Heart,
     features: [
       'Maquillaje personalizado',
@@ -26,7 +27,8 @@ const services = [
     title: 'Maquillaje artístico',
     description:
       'Ideal para crear personajes, expresar emociones o destacar en eventos especiales.',
-    image: '/maquillaje2.jpeg',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769848/maquillaje2_ivxmhw.jpg',
     icon: Sparkles,
     features: ['Productos de alta calidad', 'Asesoramiento'],
   },
@@ -35,7 +37,8 @@ const services = [
     title: 'Masajes relajantes',
     description:
       'Alivian el estrés y la tensión muscular, promoviendo bienestar físico y mental.',
-    image: '/masaje.jpeg',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769848/masaje_f6atcp.jpg',
     icon: Camera,
     features: [
       'Duración de 60min',
@@ -48,7 +51,8 @@ const services = [
     title: 'Masajes descontracturantes',
     description:
       'Eliminan tensiones profundas y alivian dolores musculares causados por el estrés o esfuerzo físico.',
-    image: '/masaje2.jpeg',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769848/masaje2_lnnygz.jpg',
     icon: Users,
     features: ['enfoque en espalda', 'duración de 60min '],
   },
@@ -57,7 +61,8 @@ const services = [
     title: 'Levantamiento en glúteos e iluminación',
     description:
       'El levantamiento de glúteos realza y tonifica la zona, mejorando su forma y firmeza.',
-    image: '/Gluteos.jpeg',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769848/Gluteos_raqwnb.jpg',
     icon: Users,
     features: [
       'Uso de aparatologia',
@@ -70,7 +75,8 @@ const services = [
     title: 'Lifting de pestañas',
     description:
       'Tratamiento que eleva y curva las pestañas desde la raíz, creando efecto de mayor longitud y volumen sin rímel.',
-    image: '/lifting.jpeg',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769848/lifting_qtmawz.jpg',
     icon: Users,
     features: ['Duración hasta 8 semanas ', 'Productos de alta calidad'],
   },
@@ -79,7 +85,8 @@ const services = [
     title: 'Laminado de cejas',
     description:
       'Peina, alinea y fija el vello en una misma dirección para cejas más definidas y simétricas.',
-    image: '/laminado.jpeg',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769847/laminado_i3ainq.jpg',
     icon: Users,
     features: [
       'Duración de 4-6 semanas',
@@ -92,7 +99,8 @@ const services = [
     title: 'Hidralips',
     description:
       'Hidrata y nutre profundamente los labios, mejorando suavidad, volumen y color natural.',
-    image: '/labios.jpeg',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769880/labios_nilxgu.jpg',
     icon: Users,
     features: [
       'duración de 1 mes ',

@@ -15,7 +15,10 @@ const founder = {
     'Terapias y bienestar corporal',
     'Facial',
   ],
-  image: ['/fundadora.jpeg', '/fundadora2.jpeg'],
+  image: [
+    'https://res.cloudinary.com/dcuethtco/image/upload/v1754769847/fundadora_gkqr4q.jpg',
+    'https://res.cloudinary.com/dcuethtco/image/upload/v1754769846/fundadora2_quuwz2.jpg',
+  ],
   highlights: ['2+ años de experiencia', '100+ clientas atendidas'],
   bio: 'Soy una cosmetóloga y maquilladora apasionada, con experiencia y capacitación en tratamientos faciales y corporales, maquillaje social, de novias, quinceañeras, editorial y artístico. Mi enfoque está en realzar la belleza de cada cliente, brindándoles una experiencia satisfactoria y personalizada.',
 };

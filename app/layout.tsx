@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: 'centro estetico manuj',
   description: 'Maquilladora y cosmetóloga profesional',
   icons: {
-    icon: '/isologo.svg',
+    icon: 'https://res.cloudinary.com/dcuethtco/image/upload/v1754769881/isologo_dhkiyh.svg',
   },
 };
 
