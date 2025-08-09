@@ -17,7 +17,6 @@ const Lightbox = dynamic(() => import('yet-another-react-lightbox'), {
 // Plugins
 import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
-import Captions from 'yet-another-react-lightbox/plugins/captions';
 import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
 
 const galleryImages = [
