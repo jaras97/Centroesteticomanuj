@@ -201,10 +201,38 @@ export default function Header() {
                   </motion.div>
                 ))}
                 <div className='pt-4 border-t border-gray-200'>
-                  <div className='flex items-center space-x-2 text-gray-600 mb-3'>
+                  <motion.div
+                    variants={mobileItem}
+                    custom={navigation.length}
+                    className='flex items-center space-x-2 text-gray-600'
+                  >
                     <Phone className='h-4 w-4' />
                     <span className='text-sm'>+57 (313) 214-6938</span>
-                  </div>
+                  </motion.div>
+                  <motion.div
+                    variants={mobileItem}
+                    custom={navigation.length + 1}
+                    className='flex items-center gap-4'
+                  >
+                    <Link
+                      href='https://www.instagram.com/centroestetico_manuj?igsh=cmRoaWd3aXljYjE%3D&utm_source=qr'
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      aria-label='Instagram'
+                      className='inline-flex p-2 rounded-full text-brand-gold hover:text-brand-brown hover:bg-amber-50 transition-colors'
+                    >
+                      <DynamicIcon name='instagram' size={22} />
+                    </Link>
+                    <Link
+                      href='https://www.facebook.com/share/16NsUkTiZN/?mibextid=wwXIfr'
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      aria-label='Facebook'
+                      className='inline-flex p-2 rounded-full text-brand-gold hover:text-brand-brown hover:bg-amber-50 transition-colors'
+                    >
+                      <DynamicIcon name='facebook' size={22} />
+                    </Link>
+                  </motion.div>
                   <motion.div variants={mobileItem} custom={navigation.length}>
                     <AnimatedButton
                       label='Reservar cita'
