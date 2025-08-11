@@ -34,6 +34,20 @@ const services = [
   },
   {
     id: 3,
+    title: 'Tratamientos faciales personalizados',
+    description:
+      'Se adaptan a las necesidades específicas de cada piel para mejorar su salud y apariencia.',
+    image:
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1754886580/facial_vlhzpy.jpg',
+    icon: Camera,
+    features: [
+      'Valoración ',
+      'Productos de alta calidad',
+      'Uso de aparatología',
+    ],
+  },
+  {
+    id: 4,
     title: 'Masajes relajantes',
     description:
       'Alivian el estrés y la tensión muscular, promoviendo bienestar físico y mental.',
@@ -47,7 +61,7 @@ const services = [
     ],
   },
   {
-    id: 4,
+    id: 5,
     title: 'Masajes descontracturantes',
     description:
       'Eliminan tensiones profundas y alivian dolores musculares causados por el estrés o esfuerzo físico.',
@@ -57,7 +71,7 @@ const services = [
     features: ['enfoque en espalda', 'duración de 60min '],
   },
   {
-    id: 5,
+    id: 6,
     title: 'Levantamiento en glúteos e iluminación',
     description:
       'El levantamiento de glúteos realza y tonifica la zona, mejorando su forma y firmeza.',
@@ -71,7 +85,7 @@ const services = [
     ],
   },
   {
-    id: 6,
+    id: 7,
     title: 'Lifting de pestañas',
     description:
       'Tratamiento que eleva y curva las pestañas desde la raíz, creando efecto de mayor longitud y volumen sin rímel.',
@@ -81,7 +95,7 @@ const services = [
     features: ['Duración hasta 8 semanas ', 'Productos de alta calidad'],
   },
   {
-    id: 7,
+    id: 8,
     title: 'Laminado de cejas',
     description:
       'Peina, alinea y fija el vello en una misma dirección para cejas más definidas y simétricas.',
@@ -95,7 +109,7 @@ const services = [
     ],
   },
   {
-    id: 8,
+    id: 9,
     title: 'Hidralips',
     description:
       'Hidrata y nutre profundamente los labios, mejorando suavidad, volumen y color natural.',
@@ -209,7 +223,7 @@ export default function ServicesSection() {
                       <AnimatedButton
                         label='Reservar Ahora'
                         href='#contacto'
-                        phone='+573132146938'
+                        phone='+573215487690'
                         message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
                       />
                     </div>
