@@ -135,7 +135,7 @@ export default function Header() {
           >
             <div className='flex items-center space-x-2 text-gray-600'>
               <Phone className='h-4 w-4' />
-              <span className='text-sm'>+57 (313) 214-6938</span>
+              <span className='text-sm'>+57 (321) 548-7690</span>
             </div>
             <div className='flex space-x-2'>
               <Link
@@ -157,7 +157,7 @@ export default function Header() {
             </div>
             <AnimatedButton
               label='Reservar cita'
-              phone='+573132146938'
+              phone='+573215487690'
               message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
             />
           </motion.div>
@@ -207,7 +207,7 @@ export default function Header() {
                     className='flex items-center space-x-2 text-gray-600'
                   >
                     <Phone className='h-4 w-4' />
-                    <span className='text-sm'>+57 (313) 214-6938</span>
+                    <span className='text-sm'>+57 (321) 548-7690</span>
                   </motion.div>
                   <motion.div
                     variants={mobileItem}
@@ -236,7 +236,7 @@ export default function Header() {
                   <motion.div variants={mobileItem} custom={navigation.length}>
                     <AnimatedButton
                       label='Reservar cita'
-                      phone='+573132146938'
+                      phone='+573215487690'
                       message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
                     />
                   </motion.div>

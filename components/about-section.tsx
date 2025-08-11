@@ -210,7 +210,7 @@ export default function AboutSection() {
                   <AnimatedButton
                     label='Reservar cita'
                     href='#contacto'
-                    phone='+573132146938'
+                    phone='+573215487690'
                     message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
                   />
                 </div>
