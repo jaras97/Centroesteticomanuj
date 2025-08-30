@@ -86,6 +86,24 @@ const galleryImages = [
     alt: 'Maquillaje social con brillo',
     category: 'Social',
   },
+  {
+    id: 12,
+    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1756580828/social2_fjseht.jpg',
+    alt: 'Maquillaje social con brillo',
+    category: 'Editorial',
+  },
+  {
+    id: 13,
+    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1756580828/social1_vndugm.jpg',
+    alt: 'Maquillaje social para evento',
+    category: 'Social',
+  },
+  {
+    id: 14,
+    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1756580828/social3_rijcgl.jpg',
+    alt: 'Maquillaje social',
+    category: 'Social',
+  },
 ];
 
 const categories = ['Todos', 'Artístico', 'Social', 'Editorial'] as const;

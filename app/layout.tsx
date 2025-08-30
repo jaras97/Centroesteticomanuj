@@ -3,6 +3,8 @@ import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+
 export const metadata: Metadata = {
   title: 'centro estetico manuj',
   description: 'Maquilladora y cosmetóloga profesional',
@@ -16,9 +18,29 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isProd = process.env.NODE_ENV === 'production';
   return (
     <html lang='en' translate='no' className='scroll-smooth'>
       <head>
+        {isProd && GA_ID && (
+          <>
+            {/* Tag de Google (equivale al <script async src=...> que te sugiere Google) */}
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+              strategy='afterInteractive'
+            />
+            {/* Inicialización */}
+            <Script id='ga-init' strategy='afterInteractive'>
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                // Importante: desactivamos el page_view automático para manejarlo con el router
+                gtag('config', '${GA_ID}', { send_page_view: false });
+              `}
+            </Script>
+          </>
+        )}
         <meta name='google' content='notranslate' />
         <style>{`
 html {
@@ -28,7 +50,13 @@ html {
 }
         `}</style>
       </head>
-      <body>{children}</body>
+      <body>
+        <GAListener />
+        {children}
+      </body>
     </html>
   );
 }
+
+import Script from 'next/script';
+import GAListener from './ga-listener';
