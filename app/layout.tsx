@@ -51,7 +51,9 @@ html {
         `}</style>
       </head>
       <body>
-        <GAListener />
+        <Suspense fallback={null}>
+          <GAListener />
+        </Suspense>
         {children}
       </body>
     </html>
@@ -60,3 +62,4 @@ html {
 
 import Script from 'next/script';
 import GAListener from './ga-listener';
+import { Suspense } from 'react';

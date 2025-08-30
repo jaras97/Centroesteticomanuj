@@ -1,4 +1,3 @@
-// app/ga-listener.tsx
 'use client';
 
 import { useEffect } from 'react';
