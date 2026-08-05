@@ -4,6 +4,7 @@ import './globals.css';
 import Script from 'next/script';
 import GAListener from './ga-listener';
 import { Suspense } from 'react';
+import { Toaster } from 'sonner';
 
 const montserrat = localFont({
   src: [
@@ -125,6 +126,7 @@ export default function RootLayout({
           <GAListener />
         </Suspense>
         {children}
+        <Toaster richColors position='top-center' />
       </body>
     </html>
   );

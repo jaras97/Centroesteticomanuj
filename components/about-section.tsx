@@ -185,12 +185,7 @@ export default function AboutSection() {
 
                 {/* CTAs con microinteracciones más suaves */}
                 <div className='mt-auto grid grid-cols-1  gap-3'>
-                  <AnimatedButton
-                    label='Reservar cita'
-                    href='#contacto'
-                    phone='+573215487690'
-                    message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
-                  />
+                  <AnimatedButton label='Reservar cita' href='/reservar' />
                 </div>
               </CardContent>
             </Card>

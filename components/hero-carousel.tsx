@@ -121,7 +121,7 @@ export default function HeroCarousel() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, ease: EASE_OUT }}
-                    className='max-w-2xl text-white'
+                    className='max-w-2xl text-white sm:pl-12 lg:pl-6'
                   >
                     <h1 className='text-4xl md:text-6xl font-bold mb-4 leading-tight'>
                       {slide.title}
@@ -134,12 +134,7 @@ export default function HeroCarousel() {
                     <p className='text-lg mb-8 text-gray-200 leading-relaxed'>
                       {slide.description}
                     </p>
-                    <AnimatedButton
-                      label='Reservar cita'
-                      href='#contacto'
-                      phone='+573215487690'
-                      message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
-                    />
+                    <AnimatedButton label='Reservar cita' href='/reservar' />
                   </motion.div>
                 </div>
               </div>
@@ -154,7 +149,7 @@ export default function HeroCarousel() {
         onClick={scrollPrev}
         disabled={!canPrev && slides.length <= 1}
         aria-label='Anterior'
-        className='absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full p-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
+        className='hidden sm:flex absolute left-2 lg:left-4 top-1/2 -translate-y-1/2 items-center justify-center bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full p-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
       >
         <ChevronLeft className='h-6 w-6 text-white' />
       </button>
@@ -163,7 +158,7 @@ export default function HeroCarousel() {
         onClick={scrollNext}
         disabled={!canNext && slides.length <= 1}
         aria-label='Siguiente'
-        className='absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full p-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
+        className='hidden sm:flex absolute right-2 lg:right-4 top-1/2 -translate-y-1/2 items-center justify-center bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full p-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
       >
         <ChevronRight className='h-6 w-6 text-white' />
       </button>

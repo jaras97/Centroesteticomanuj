@@ -1,8 +1,14 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Phone, Mail, MapPin } from 'lucide-react';
+import { Phone, Mail, MapPin, MessageCircle } from 'lucide-react';
 
 import { DynamicIcon } from 'lucide-react/dynamic';
+import { BUSINESS_WHATSAPP_NUMBER, buildWhatsAppLink } from '@/lib/whatsapp';
+
+const whatsappLink = buildWhatsAppLink(
+  BUSINESS_WHATSAPP_NUMBER,
+  'Hola, quiero más información.',
+);
 
 export default function Footer() {
   return (
@@ -30,7 +36,14 @@ export default function Footer() {
             <div className='space-y-4'>
               <div className='flex items-center space-x-3'>
                 <Phone className='h-5 w-5 text-brand-teal-light' />
-                <span>+57 (321) 548-7690</span>
+                <a
+                  href={whatsappLink}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='hover:text-brand-teal-light transition-colors'
+                >
+                  +57 (321) 548-7690
+                </a>
               </div>
               <div className='flex items-center space-x-3'>
                 <Mail className='h-5 w-5 text-brand-teal-light' />
@@ -57,7 +70,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href='#servicios'
+                  href='/#servicios'
                   className='text-gray-300 hover:text-brand-teal-light transition-colors'
                 >
                   Servicios
@@ -65,7 +78,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href='#galeria'
+                  href='/#galeria'
                   className='text-gray-300 hover:text-brand-teal-light transition-colors'
                 >
                   Galería
@@ -73,7 +86,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href='#nosotros'
+                  href='/#nosotros'
                   className='text-gray-300 hover:text-brand-teal-light transition-colors'
                 >
                   Nosotros
@@ -103,6 +116,15 @@ export default function Footer() {
               >
                 <DynamicIcon name='facebook' size={24} />
               </Link>
+              <a
+                href={whatsappLink}
+                target='_blank'
+                rel='noopener noreferrer'
+                aria-label='WhatsApp'
+                className='text-brand-teal-light hover:text-white'
+              >
+                <MessageCircle size={24} />
+              </a>
             </div>
             <div className='text-gray-400 text-sm'>
               © 2025 Centro Estetico ManuJ. Todos los derechos reservados.

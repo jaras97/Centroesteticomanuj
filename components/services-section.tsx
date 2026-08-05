@@ -182,12 +182,7 @@ export default function ServicesSection() {
 
                     {/* CTA al fondo */}
                     <div className='mt-auto'>
-                      <AnimatedButton
-                        label='Reservar Ahora'
-                        href='#contacto'
-                        phone='+573215487690'
-                        message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
-                      />
+                      <AnimatedButton label='Reservar Ahora' href='/reservar' />
                     </div>
                   </CardContent>
                 </Card>

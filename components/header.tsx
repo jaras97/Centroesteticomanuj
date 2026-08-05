@@ -155,11 +155,7 @@ export default function Header() {
                 <DynamicIcon name='facebook' size={24} />
               </Link>
             </div>
-            <AnimatedButton
-              label='Reservar cita'
-              phone='+573215487690'
-              message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
-            />
+            <AnimatedButton label='Reservar cita' href='/reservar' />
           </motion.div>
 
           {/* Mobile menu button */}
@@ -234,11 +230,7 @@ export default function Header() {
                     </Link>
                   </motion.div>
                   <motion.div variants={mobileItem} custom={navigation.length}>
-                    <AnimatedButton
-                      label='Reservar cita'
-                      phone='+573215487690'
-                      message='¡Hola! Me gustaría reservar una cita para un tratamiento.'
-                    />
+                    <AnimatedButton label='Reservar cita' href='/reservar' />
                   </motion.div>
                 </div>
               </nav>

@@ -1,0 +1,6 @@
+export const BUSINESS_WHATSAPP_NUMBER = '+573215487690';
+
+export function buildWhatsAppLink(phone: string, message: string): string {
+  const digits = phone.replace(/\D/g, '');
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}

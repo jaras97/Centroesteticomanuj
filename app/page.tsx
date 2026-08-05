@@ -5,6 +5,7 @@ import GallerySection from "@/components/gallery-section"
 import AboutSection from "@/components/about-section"
 import MissionVisionSection from "@/components/mission-vision-section"
 import Footer from "@/components/footer"
+import WhatsAppFloatButton from "@/components/whatsapp-float-button"
 
 export default function HomePage() {
   return (
@@ -18,6 +19,7 @@ export default function HomePage() {
         <MissionVisionSection />
       </main>
       <Footer />
+      <WhatsAppFloatButton />
     </div>
   )
 }
