@@ -22,7 +22,7 @@ const slides: Slide[] = [
   {
     id: 1,
     image:
-      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769880/artistico_rqsquf.jpg',
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1785888046/social11_s8n04p.jpg',
     title: 'Maquillaje Profesional',
     description:
       'Servicio de maquillaje profesional para eventos especiales, bodas, grados, cumpleaños, sesiones fotográficas, etc.',
