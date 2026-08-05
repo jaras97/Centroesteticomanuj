@@ -6,13 +6,13 @@ import { DynamicIcon } from 'lucide-react/dynamic';
 
 export default function Footer() {
   return (
-    <footer id='contacto' className='bg-black text-white'>
+    <footer id='contacto' className='bg-brand-ink text-white'>
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16'>
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8'>
           {/* Company Info */}
           <div className='lg:col-span-2'>
             <div className='mb-6'>
-              <h3 className='text-2xl font-bold bg-gradient-to-r from-brand-gold to-amber-300 bg-clip-text text-transparent mb-4'>
+              <h3 className='text-2xl font-bold mb-4'>
                 <Image
                   src='https://res.cloudinary.com/dcuethtco/image/upload/v1754769881/isologo_dhkiyh.svg'
                   alt='Logo'
@@ -29,15 +29,15 @@ export default function Footer() {
             {/* Contact Info */}
             <div className='space-y-4'>
               <div className='flex items-center space-x-3'>
-                <Phone className='h-5 w-5 text-brand-gold' />
+                <Phone className='h-5 w-5 text-brand-teal-light' />
                 <span>+57 (321) 548-7690</span>
               </div>
               <div className='flex items-center space-x-3'>
-                <Mail className='h-5 w-5 text-brand-gold' />
+                <Mail className='h-5 w-5 text-brand-teal-light' />
                 <span>centroesteticomanuj@gmail.com</span>
               </div>
               <div className='flex items-center space-x-3'>
-                <MapPin className='h-5 w-5 text-brand-gold' />
+                <MapPin className='h-5 w-5 text-brand-teal-light' />
                 <span>Chigorodo, Ant</span>
               </div>
             </div>
@@ -50,7 +50,7 @@ export default function Footer() {
               <li>
                 <Link
                   href='/'
-                  className='text-gray-300 hover:text-brand-gold transition-colors'
+                  className='text-gray-300 hover:text-brand-teal-light transition-colors'
                 >
                   Inicio
                 </Link>
@@ -58,7 +58,7 @@ export default function Footer() {
               <li>
                 <Link
                   href='#servicios'
-                  className='text-gray-300 hover:text-brand-gold transition-colors'
+                  className='text-gray-300 hover:text-brand-teal-light transition-colors'
                 >
                   Servicios
                 </Link>
@@ -66,7 +66,7 @@ export default function Footer() {
               <li>
                 <Link
                   href='#galeria'
-                  className='text-gray-300 hover:text-brand-gold transition-colors'
+                  className='text-gray-300 hover:text-brand-teal-light transition-colors'
                 >
                   Galería
                 </Link>
@@ -74,7 +74,7 @@ export default function Footer() {
               <li>
                 <Link
                   href='#nosotros'
-                  className='text-gray-300 hover:text-brand-gold transition-colors'
+                  className='text-gray-300 hover:text-brand-teal-light transition-colors'
                 >
                   Nosotros
                 </Link>
@@ -91,7 +91,7 @@ export default function Footer() {
                 href='https://www.instagram.com/centroestetico_manuj?igsh=cmRoaWd3aXljYjE%3D&utm_source=qr'
                 target='_blank'
                 rel='noopener noreferrer'
-                className='text-brand-gold hover:text-brand-brown'
+                className='text-brand-teal-light hover:text-white'
               >
                 <DynamicIcon name='instagram' size={24} />
               </Link>
@@ -99,7 +99,7 @@ export default function Footer() {
                 href='https://www.facebook.com/share/16NsUkTiZN/?mibextid=wwXIfr'
                 target='_blank'
                 rel='noopener noreferrer'
-                className='text-brand-gold hover:text-brand-brown'
+                className='text-brand-teal-light hover:text-white'
               >
                 <DynamicIcon name='facebook' size={24} />
               </Link>

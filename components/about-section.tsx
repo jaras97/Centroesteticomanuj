@@ -12,15 +12,13 @@ const founder = {
     'Fundadora',
     'Maquilladora profesional',
     'Especialista en maquillaje artístico',
-    'Terapias y bienestar corporal',
-    'Facial',
+    'Tratamientos faciales',
   ],
   image: [
     'https://res.cloudinary.com/dcuethtco/image/upload/v1754769847/fundadora_gkqr4q.jpg',
     'https://res.cloudinary.com/dcuethtco/image/upload/v1754769846/fundadora2_quuwz2.jpg',
   ],
-  highlights: ['2+ años de experiencia', '100+ clientas atendidas'],
-  bio: 'Soy una cosmetóloga y maquilladora apasionada, con experiencia y capacitación en tratamientos faciales y corporales, maquillaje social, de novias, quinceañeras, editorial y artístico. Mi enfoque está en realzar la belleza de cada cliente, brindándoles una experiencia satisfactoria y personalizada.',
+  bio: 'Soy cosmetóloga y maquilladora profesional, apasionada por el cuidado de la piel y el arte del maquillaje. Cuento con experiencia y formación en tratamientos faciales, maquillaje social, para novias, quinceañeras, editorial y artístico. Mi compromiso es realzar la belleza natural de cada cliente a través de un servicio personalizado, técnicas actualizadas y una experiencia diseñada para brindar confianza, bienestar y resultados de alta calidad.',
 };
 
 // Easing cubic-bezier (equivalente a easeOut)
@@ -66,7 +64,7 @@ export default function AboutSection() {
         >
           <motion.h2
             variants={item}
-            className='text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-brand-gold to-brand-brown bg-clip-text text-transparent'
+            className='text-4xl md:text-5xl font-bold mb-6 text-brand-ink'
           >
             Sobre Nosotros
           </motion.h2>
@@ -92,7 +90,7 @@ export default function AboutSection() {
             whileInView='show'
             viewport={{ once: true, amount: 0.3 }}
             variants={item}
-            className='text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-brand-gold to-brand-brown bg-clip-text text-transparent text-center'
+            className='text-4xl md:text-5xl font-bold mb-6 text-brand-ink text-center'
           >
             Conoce a la fundadora
           </motion.h2>
@@ -165,7 +163,7 @@ export default function AboutSection() {
                       <motion.span
                         key={r}
                         variants={item}
-                        className='inline-flex items-center rounded-full bg-amber-50 text-brand-brown border border-amber-200 px-3 py-1 text-xs font-semibold'
+                        className='inline-flex items-center rounded-full bg-brand-sand/20 text-brand-ink border border-brand-sand px-3 py-1 text-xs font-semibold'
                         whileHover={shouldReduce ? {} : { y: -2 }}
                         transition={{ duration: 0.2 }}
                       >
@@ -174,26 +172,6 @@ export default function AboutSection() {
                     ))}
                   </motion.div>
                 </div>
-
-                {/* Highlights */}
-                <motion.ul
-                  initial='hidden'
-                  whileInView='show'
-                  viewport={{ once: true }}
-                  variants={stagger}
-                  className='flex flex-wrap gap-4 mb-4 text-sm text-gray-700'
-                >
-                  {founder.highlights.map((h) => (
-                    <motion.li
-                      key={h}
-                      variants={item}
-                      className='flex items-center gap-2'
-                    >
-                      <span className='w-1.5 h-1.5 rounded-full bg-brand-gold' />
-                      {h}
-                    </motion.li>
-                  ))}
-                </motion.ul>
 
                 <motion.p
                   initial={{ opacity: 0, y: 10 }}

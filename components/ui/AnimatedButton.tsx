@@ -32,7 +32,7 @@ export default function AnimatedButton({
       href={link}
       target={phone ? '_blank' : undefined}
       rel={phone ? 'noopener noreferrer' : undefined}
-      className='inline-flex items-center justify-center rounded-md px-4 py-2 font-semibold text-white bg-gradient-to-r from-brand-gold to-brand-brown hover:from-brand-gold-dark hover:to-brand-brown-dark'
+      className='inline-flex items-center justify-center rounded-md px-4 py-2 font-semibold text-white bg-brand-teal hover:bg-brand-teal-dark transition-colors'
       whileHover={shouldReduce ? {} : { y: -1, scale: 1.01 }}
       whileTap={{ scale: 0.985 }}
       transition={{ duration: 0.18, ease: EASE_OUT }}

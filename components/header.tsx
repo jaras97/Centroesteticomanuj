@@ -94,7 +94,7 @@ export default function Header() {
           >
             <Link
               href='/'
-              className='text-2xl font-bold bg-gradient-to-r from-brand-gold to-brand-brown bg-clip-text text-transparent'
+              className='text-2xl font-bold text-brand-ink'
             >
               <Image
                 src='https://res.cloudinary.com/dcuethtco/image/upload/v1754769881/isologo_dhkiyh.svg'
@@ -118,7 +118,7 @@ export default function Header() {
               >
                 <Link
                   href={item.href}
-                  className='text-gray-700 hover:text-brand-gold transition-colors duration-200 font-medium'
+                  className='text-gray-700 hover:text-brand-teal transition-colors duration-200 font-medium'
                 >
                   {item.name}
                 </Link>
@@ -142,7 +142,7 @@ export default function Header() {
                 href='https://www.instagram.com/centroestetico_manuj?igsh=cmRoaWd3aXljYjE%3D&utm_source=qr'
                 target='_blank'
                 rel='noopener noreferrer'
-                className='text-brand-gold hover:text-brand-brown'
+                className='text-brand-teal hover:text-brand-teal-dark'
               >
                 <DynamicIcon name='instagram' size={24} />
               </Link>
@@ -150,7 +150,7 @@ export default function Header() {
                 href='https://www.facebook.com/share/16NsUkTiZN/?mibextid=wwXIfr'
                 target='_blank'
                 rel='noopener noreferrer'
-                className='text-brand-gold hover:text-brand-brown'
+                className='text-brand-teal hover:text-brand-teal-dark'
               >
                 <DynamicIcon name='facebook' size={24} />
               </Link>
@@ -193,7 +193,7 @@ export default function Header() {
                   <motion.div key={item.name} variants={mobileItem} custom={i}>
                     <Link
                       href={item.href}
-                      className='text-gray-700 hover:text-brand-gold transition-colors duration-200 font-medium'
+                      className='text-gray-700 hover:text-brand-teal transition-colors duration-200 font-medium'
                       onClick={() => setIsMenuOpen(false)}
                     >
                       {item.name}
@@ -219,7 +219,7 @@ export default function Header() {
                       target='_blank'
                       rel='noopener noreferrer'
                       aria-label='Instagram'
-                      className='inline-flex p-2 rounded-full text-brand-gold hover:text-brand-brown hover:bg-amber-50 transition-colors'
+                      className='inline-flex p-2 rounded-full text-brand-teal hover:text-brand-teal-dark hover:bg-brand-sand/20 transition-colors'
                     >
                       <DynamicIcon name='instagram' size={22} />
                     </Link>
@@ -228,7 +228,7 @@ export default function Header() {
                       target='_blank'
                       rel='noopener noreferrer'
                       aria-label='Facebook'
-                      className='inline-flex p-2 rounded-full text-brand-gold hover:text-brand-brown hover:bg-amber-50 transition-colors'
+                      className='inline-flex p-2 rounded-full text-brand-teal hover:text-brand-teal-dark hover:bg-brand-sand/20 transition-colors'
                     >
                       <DynamicIcon name='facebook' size={22} />
                     </Link>

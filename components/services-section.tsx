@@ -38,7 +38,7 @@ const services = [
     description:
       'Se adaptan a las necesidades específicas de cada piel para mejorar su salud y apariencia.',
     image:
-      'https://res.cloudinary.com/dcuethtco/image/upload/v1754886580/facial_vlhzpy.jpg',
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1785881648/cosme_v48p1n.jpg',
     icon: Camera,
     features: [
       'Valoración ',
@@ -48,54 +48,16 @@ const services = [
   },
   {
     id: 4,
-    title: 'Masajes relajantes',
-    description:
-      'Alivian el estrés y la tensión muscular, promoviendo bienestar físico y mental.',
-    image:
-      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769848/masaje_f6atcp.jpg',
-    icon: Camera,
-    features: [
-      'Duración de 60min',
-      'Cuerpo completo',
-      'Enfoque donde la persona lo requiera',
-    ],
-  },
-  {
-    id: 5,
-    title: 'Masajes descontracturantes',
-    description:
-      'Eliminan tensiones profundas y alivian dolores musculares causados por el estrés o esfuerzo físico.',
-    image:
-      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769848/masaje2_lnnygz.jpg',
-    icon: Users,
-    features: ['enfoque en espalda', 'duración de 60min '],
-  },
-  {
-    id: 6,
-    title: 'Levantamiento en glúteos e iluminación',
-    description:
-      'El levantamiento de glúteos realza y tonifica la zona, mejorando su forma y firmeza.',
-    image:
-      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769848/Gluteos_raqwnb.jpg',
-    icon: Users,
-    features: [
-      'Uso de aparatologia',
-      'Duración de 90min ',
-      'Mascarillas según necesidades ',
-    ],
-  },
-  {
-    id: 7,
     title: 'Lifting de pestañas',
     description:
       'Tratamiento que eleva y curva las pestañas desde la raíz, creando efecto de mayor longitud y volumen sin rímel.',
     image:
-      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769848/lifting_qtmawz.jpg',
+      'https://res.cloudinary.com/dcuethtco/image/upload/v1785888013/lifting_xmoouf.jpg',
     icon: Users,
     features: ['Duración hasta 8 semanas ', 'Productos de alta calidad'],
   },
   {
-    id: 8,
+    id: 5,
     title: 'Laminado de cejas',
     description:
       'Peina, alinea y fija el vello en una misma dirección para cejas más definidas y simétricas.',
@@ -109,7 +71,7 @@ const services = [
     ],
   },
   {
-    id: 9,
+    id: 6,
     title: 'Hidralips',
     description:
       'Hidrata y nutre profundamente los labios, mejorando suavidad, volumen y color natural.',
@@ -157,7 +119,7 @@ export default function ServicesSection() {
           variants={headerContainer}
           className='text-center mb-16'
         >
-          <h2 className='text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-brand-gold to-brand-brown bg-clip-text text-transparent'>
+          <h2 className='text-4xl md:text-5xl font-bold mb-6 text-brand-ink'>
             Nuestros Servicios
           </h2>
           <p className='text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed'>
@@ -169,7 +131,7 @@ export default function ServicesSection() {
         </motion.div>
 
         {/* Grid — sin orquestación global; cada card se anima al entrar */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8'>
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8'>
           {services.map((service, idx) => {
             const IconComponent = service.icon;
             return (
@@ -184,7 +146,7 @@ export default function ServicesSection() {
                 transition={{ duration: 0.25, ease: EASE_OUT }}
                 className='h-full'
               >
-                <Card className='group hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br from-amber-50 to-white overflow-hidden h-full flex flex-col'>
+                <Card className='group hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br from-brand-sand/10 to-white overflow-hidden h-full flex flex-col'>
                   <div className='relative h-48 overflow-hidden'>
                     <Image
                       src={service.image || '/placeholder.svg'}
@@ -194,7 +156,7 @@ export default function ServicesSection() {
                       priority={service.id === 1}
                     />
                     <div className='absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-full p-2'>
-                      <IconComponent className='h-5 w-5 text-brand-gold' />
+                      <IconComponent className='h-5 w-5 text-brand-teal' />
                     </div>
                   </div>
 
@@ -212,7 +174,7 @@ export default function ServicesSection() {
                           key={index}
                           className='flex items-center text-sm text-gray-600'
                         >
-                          <div className='w-1.5 h-1.5 bg-brand-gold rounded-full mr-2' />
+                          <div className='w-1.5 h-1.5 bg-brand-teal rounded-full mr-2' />
                           {feature}
                         </li>
                       ))}

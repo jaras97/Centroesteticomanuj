@@ -19,6 +19,10 @@ const config: Config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", "sans-serif"],
+        display: ["var(--font-display)", "serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -26,12 +30,12 @@ const config: Config = {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "#C6A451", 
+          DEFAULT: "#739DAA",
           foreground: "#ffffff",
         },
         secondary: {
-          DEFAULT: "#8D7040", 
-          foreground: "#ffffff",
+          DEFAULT: "#D2B8A1",
+          foreground: "#0C0C0C",
         },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
@@ -53,28 +57,16 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Colores personalizados de la marca
+        // Colores de marca
         brand: {
-          gold: "#C6A451",
-          brown: "#8D7040",
+          ink: "#0C0C0C",
+          sand: "#D2B8A1",
+          "sand-light": "#E6D8C9",
+          "sand-dark": "#B79A80",
+          teal: "#739DAA",
+          "teal-light": "#8FB1BC",
+          "teal-dark": "#5C818C",
           white: "#FFFFFF",
-          "gold-light": "#D4B566",
-          "gold-dark": "#B8973C",
-          "brown-light": "#A08455",
-          "brown-dark": "#7A632B",
-        },
-        // Mantener algunos tonos neutros para variaciones
-        amber: {
-          50: "#fefdf8",
-          100: "#fef7e0",
-          200: "#fdecc4",
-          300: "#fbdb9b",
-          400: "#f8c572",
-          500: "#C6A451",
-          600: "#B8973C",
-          700: "#9A7D32",
-          800: "#8D7040",
-          900: "#7A632B",
         },
       },
       borderRadius: {

@@ -127,7 +127,7 @@ export default function HeroCarousel() {
                       {slide.title}
                     </h1>
                     {slide.subtitle ? (
-                      <p className='text-xl md:text-2xl mb-4 text-amber-200'>
+                      <p className='text-xl md:text-2xl mb-4 text-brand-sand'>
                         {slide.subtitle}
                       </p>
                     ) : null}

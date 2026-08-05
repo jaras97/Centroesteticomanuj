@@ -1,7 +1,80 @@
 import type { Metadata } from 'next';
-import { GeistSans } from 'geist/font/sans';
-import { GeistMono } from 'geist/font/mono';
+import localFont from 'next/font/local';
 import './globals.css';
+import Script from 'next/script';
+import GAListener from './ga-listener';
+import { Suspense } from 'react';
+
+const montserrat = localFont({
+  src: [
+    { path: './fonts/Montserrat-Thin.ttf', weight: '100', style: 'normal' },
+    {
+      path: './fonts/Montserrat-ThinItalic.ttf',
+      weight: '100',
+      style: 'italic',
+    },
+    {
+      path: './fonts/Montserrat-ExtraLightItalic.ttf',
+      weight: '200',
+      style: 'italic',
+    },
+    { path: './fonts/Montserrat-Light.ttf', weight: '300', style: 'normal' },
+    {
+      path: './fonts/Montserrat-Regular.ttf',
+      weight: '400',
+      style: 'normal',
+    },
+    { path: './fonts/Montserrat-Italic.ttf', weight: '400', style: 'italic' },
+    {
+      path: './fonts/Montserrat-SemiBold.ttf',
+      weight: '600',
+      style: 'normal',
+    },
+    {
+      path: './fonts/Montserrat-SemiBoldItalic.ttf',
+      weight: '600',
+      style: 'italic',
+    },
+    { path: './fonts/Montserrat-Bold.ttf', weight: '700', style: 'normal' },
+    {
+      path: './fonts/Montserrat-BoldItalic.ttf',
+      weight: '700',
+      style: 'italic',
+    },
+    {
+      path: './fonts/Montserrat-ExtraBold.ttf',
+      weight: '800',
+      style: 'normal',
+    },
+    {
+      path: './fonts/Montserrat-ExtraBoldItalic.ttf',
+      weight: '800',
+      style: 'italic',
+    },
+    { path: './fonts/Montserrat-Black.ttf', weight: '900', style: 'normal' },
+    {
+      path: './fonts/Montserrat-BlackItalic.ttf',
+      weight: '900',
+      style: 'italic',
+    },
+  ],
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+const copperplate = localFont({
+  src: [
+    { path: './fonts/Copperplate-Light.ttf', weight: '300', style: 'normal' },
+    {
+      path: './fonts/Copperplate-Regular.ttf',
+      weight: '400',
+      style: 'normal',
+    },
+    { path: './fonts/Copperplate-Bold.ttf', weight: '700', style: 'normal' },
+  ],
+  variable: '--font-display',
+  display: 'swap',
+});
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
@@ -20,7 +93,11 @@ export default function RootLayout({
 }>) {
   const isProd = process.env.NODE_ENV === 'production';
   return (
-    <html lang='en' translate='no' className='scroll-smooth'>
+    <html
+      lang='en'
+      translate='no'
+      className={`scroll-smooth ${montserrat.variable} ${copperplate.variable}`}
+    >
       <head>
         {isProd && GA_ID && (
           <>
@@ -42,15 +119,8 @@ export default function RootLayout({
           </>
         )}
         <meta name='google' content='notranslate' />
-        <style>{`
-html {
-  font-family: ${GeistSans.style.fontFamily};
-  --font-sans: ${GeistSans.variable};
-  --font-mono: ${GeistMono.variable};
-}
-        `}</style>
       </head>
-      <body>
+      <body className='font-sans'>
         <Suspense fallback={null}>
           <GAListener />
         </Suspense>
@@ -59,7 +129,3 @@ html {
     </html>
   );
 }
-
-import Script from 'next/script';
-import GAListener from './ga-listener';
-import { Suspense } from 'react';

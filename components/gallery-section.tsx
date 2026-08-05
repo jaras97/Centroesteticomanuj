@@ -7,8 +7,8 @@ import { motion, AnimatePresence, useInView } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 
 // Estilos YARL
-import 'yet-another-react-lightbox/styles.css';
-import 'yet-another-react-lightbox/plugins/thumbnails.css';
+// import 'yet-another-react-lightbox/styles.css';
+// import 'yet-another-react-lightbox/plugins/thumbnails.css';
 
 // Lightbox sin SSR
 const Lightbox = dynamic(() => import('yet-another-react-lightbox'), {
@@ -104,6 +104,42 @@ const galleryImages = [
     alt: 'Maquillaje social',
     category: 'Social',
   },
+  {
+    id: 15,
+    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888013/editorial3_gxlk5n.jpg',
+    alt: 'Maquillaje social con brillo',
+    category: 'Editorial',
+  },
+  {
+    id: 16,
+    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888012/artistico11_t1mtdu.jpg',
+    alt: 'Maquillaje Artístico',
+    category: 'Artístico',
+  },
+  {
+    id: 17,
+    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888013/artistico10_wryxnq.jpg',
+    alt: 'Maquillaje Artístico',
+    category: 'Artístico',
+  },
+  {
+    id: 18,
+    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888014/social20_wkfluv.jpg',
+    alt: 'Maquillaje social para evento',
+    category: 'Social',
+  },
+  {
+    id: 19,
+    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888013/social10_g51u5k.jpg',
+    alt: 'Maquillaje social para evento',
+    category: 'Social',
+  },
+  {
+    id: 20,
+    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888046/social11_s8n04p.jpg',
+    alt: 'Maquillaje social para evento',
+    category: 'Social',
+  },
 ];
 
 const categories = ['Todos', 'Artístico', 'Social', 'Editorial'] as const;
@@ -163,7 +199,7 @@ export default function GallerySection() {
     <section
       id='galeria'
       ref={sectionRef}
-      className='py-20 bg-gradient-to-br from-amber-50 to-white'
+      className='py-20 bg-gradient-to-br from-brand-sand/10 to-white'
     >
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
         {/* Header */}
@@ -174,7 +210,7 @@ export default function GallerySection() {
           viewport={{ once: true, amount: 0.12, margin: '0px 0px 0px 0px' }} // trigger más permisivo en mobile
           className='text-center mb-16'
         >
-          <h2 className='text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-brand-gold to-brand-brown bg-clip-text text-transparent'>
+          <h2 className='text-4xl md:text-5xl font-bold mb-6 text-brand-ink'>
             Galería de Trabajos
           </h2>
           <p className='text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-8'>
@@ -194,8 +230,8 @@ export default function GallerySection() {
                   }}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                     active
-                      ? 'bg-gradient-to-r from-brand-gold to-brand-brown text-white shadow-lg'
-                      : 'bg-white text-gray-600 hover:bg-amber-100 hover:text-brand-brown'
+                      ? 'bg-brand-teal text-white shadow-lg'
+                      : 'bg-white text-gray-600 hover:bg-brand-sand/20 hover:text-brand-ink'
                   }`}
                 >
                   {c}
