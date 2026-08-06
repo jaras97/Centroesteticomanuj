@@ -1,6 +1,7 @@
 import { Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import ClientsTable, { type ClientRow } from '@/components/admin/clients-table';
+import ClientFormDialog from '@/components/admin/client-form-dialog';
 
 export default async function ClientesPage() {
   const supabase = await createClient();
@@ -35,10 +36,13 @@ export default async function ClientesPage() {
 
   return (
     <div>
-      <h1 className='flex items-center gap-2 text-2xl font-bold text-brand-ink mb-6'>
-        <Users className='h-6 w-6 text-brand-teal' />
-        Clientes
-      </h1>
+      <div className='flex items-center justify-between mb-6'>
+        <h1 className='flex items-center gap-2 text-2xl font-bold text-brand-ink'>
+          <Users className='h-6 w-6 text-brand-teal' />
+          Clientes
+        </h1>
+        <ClientFormDialog />
+      </div>
       <ClientsTable clients={rows} />
     </div>
   );

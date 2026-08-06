@@ -309,6 +309,38 @@ export async function rescheduleAppointment(id: string, newStartTimeIso: string)
   return { ok: true };
 }
 
+export async function createClientRecord(input: {
+  name: string;
+  phone: string;
+  email?: string;
+  birthday?: string;
+  notes?: string;
+}) {
+  const supabase = await requireUser();
+
+  if (!input.name.trim() || !input.phone.trim()) {
+    return { ok: false, error: 'Nombre y teléfono son obligatorios.' };
+  }
+
+  const { error } = await supabase.from('clients').insert({
+    name: input.name.trim(),
+    phone: input.phone.trim(),
+    email: input.email?.trim() || null,
+    birthday: input.birthday || null,
+    notes: input.notes?.trim() || null,
+  });
+
+  if (error) {
+    if (error.code === '23505') {
+      return { ok: false, error: 'Ya existe un cliente con ese teléfono.' };
+    }
+    return { ok: false, error: 'No se pudo registrar el cliente.' };
+  }
+
+  revalidatePath('/admin/clientes');
+  return { ok: true };
+}
+
 export async function updateClient(
   id: string,
   input: {
