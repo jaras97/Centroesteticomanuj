@@ -76,6 +76,35 @@ export default function Header() {
     { name: 'Nosotros', href: '#nosotros' },
   ];
 
+  // En mobile, el panel del menú tarda ~250ms (PANEL_OUT) en colapsar. Si el
+  // salto al ancla ocurre mientras el panel todavía ocupa espacio, el navegador
+  // calcula mal la posición y termina bajando de más. Por eso, cuando el menú
+  // está abierto, cerramos primero y hacemos scroll una vez colapsa.
+  const handleNavClick = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    href: string,
+  ) => {
+    const hashIndex = href.indexOf('#');
+    if (hashIndex === -1) return;
+
+    const id = href.slice(hashIndex + 1);
+    const target = document.getElementById(id);
+    if (!target) return; // no estamos en esta página; deja que Next navegue
+
+    e.preventDefault();
+    const scrollToTarget = () =>
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    if (isMenuOpen) {
+      setIsMenuOpen(false);
+      window.setTimeout(scrollToTarget, 300);
+    } else {
+      scrollToTarget();
+    }
+  };
+
   return (
     <motion.header
       className='bg-white/95 backdrop-blur-sm shadow-lg sticky top-0 z-50'
@@ -118,6 +147,7 @@ export default function Header() {
               >
                 <Link
                   href={item.href}
+                  onClick={(e) => handleNavClick(e, item.href)}
                   className='text-gray-700 hover:text-brand-teal transition-colors duration-200 font-medium'
                 >
                   {item.name}
@@ -190,7 +220,7 @@ export default function Header() {
                     <Link
                       href={item.href}
                       className='text-gray-700 hover:text-brand-teal transition-colors duration-200 font-medium'
-                      onClick={() => setIsMenuOpen(false)}
+                      onClick={(e) => handleNavClick(e, item.href)}
                     >
                       {item.name}
                     </Link>

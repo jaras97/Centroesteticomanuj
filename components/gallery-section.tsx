@@ -6,9 +6,10 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 
-// Estilos YARL
-// import 'yet-another-react-lightbox/styles.css';
-// import 'yet-another-react-lightbox/plugins/thumbnails.css';
+// Estilos YARL (sin esto el visor no tiene position:fixed y se renderiza
+// inline al final del documento, empujando toda la página hacia abajo)
+import 'yet-another-react-lightbox/styles.css';
+import 'yet-another-react-lightbox/plugins/thumbnails.css';
 
 // Lightbox sin SSR
 const Lightbox = dynamic(() => import('yet-another-react-lightbox'), {

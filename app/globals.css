@@ -8,6 +8,12 @@
   }
 }
 
+/* Compensa el header sticky al saltar a un ancla (#servicios, #galeria, etc.)
+   para que el título de la sección no quede tapado. */
+html {
+  scroll-padding-top: 6rem;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

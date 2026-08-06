@@ -147,12 +147,13 @@ export default function ServicesSection() {
                 className='h-full'
               >
                 <Card className='group hover:shadow-2xl transition-all duration-300 border-0 bg-gradient-to-br from-brand-sand/10 to-white overflow-hidden h-full flex flex-col'>
-                  <div className='relative h-48 overflow-hidden'>
+                  <div className='relative aspect-[4/5] overflow-hidden'>
                     <Image
                       src={service.image || '/placeholder.svg'}
                       alt={service.title}
                       fill
                       className='object-cover transition-transform duration-500 group-hover:scale-110'
+                      sizes='(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw'
                       priority={service.id === 1}
                     />
                     <div className='absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-full p-2'>
