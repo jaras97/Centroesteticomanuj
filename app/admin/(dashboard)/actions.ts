@@ -344,6 +344,75 @@ export async function updateClient(
   return { ok: true };
 }
 
+function revalidateServices() {
+  revalidatePath('/admin/servicios');
+  revalidatePath('/admin/reservar');
+  revalidatePath('/reservar');
+}
+
+interface ServiceInput {
+  name: string;
+  description?: string;
+  durationMin: number;
+  bufferMin: number;
+  price?: number | null;
+  depositAmount?: number | null;
+}
+
+export async function createService(input: ServiceInput) {
+  const supabase = await requireUser();
+
+  if (!input.name.trim()) return { ok: false, error: 'El nombre es obligatorio.' };
+
+  const { error } = await supabase.from('services').insert({
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    duration_min: input.durationMin,
+    buffer_min: input.bufferMin,
+    price: input.price ?? null,
+    deposit_amount: input.depositAmount ?? null,
+  });
+
+  if (error) return { ok: false, error: 'No se pudo crear el servicio.' };
+
+  revalidateServices();
+  return { ok: true };
+}
+
+export async function updateService(id: string, input: ServiceInput) {
+  const supabase = await requireUser();
+
+  if (!input.name.trim()) return { ok: false, error: 'El nombre es obligatorio.' };
+
+  const { error } = await supabase
+    .from('services')
+    .update({
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      duration_min: input.durationMin,
+      buffer_min: input.bufferMin,
+      price: input.price ?? null,
+      deposit_amount: input.depositAmount ?? null,
+    })
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar el servicio.' };
+
+  revalidateServices();
+  return { ok: true };
+}
+
+export async function setServiceActive(id: string, active: boolean) {
+  const supabase = await requireUser();
+
+  const { error } = await supabase.from('services').update({ active }).eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar el servicio.' };
+
+  revalidateServices();
+  return { ok: true };
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();

@@ -7,6 +7,7 @@ import DepositReceivedButton from '@/components/admin/deposit-received-button';
 import RescheduleDialog from '@/components/admin/reschedule-dialog';
 import { formatBogotaHuman } from '@/lib/booking/timezone';
 import { buildWhatsAppLink } from '@/lib/whatsapp';
+import { formatCOP } from '@/lib/format';
 
 export interface SolicitudRow {
   id: string;
@@ -28,12 +29,6 @@ export interface SolicitudRow {
   };
 }
 
-const currency = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
 export default function SolicitudCard({
   request,
   isNewClient,
@@ -47,7 +42,7 @@ export default function SolicitudCard({
     request.clients.name.trim().toLowerCase();
 
   const whatsappMessage = requiresDeposit
-    ? `¡Hola ${request.clients.name}! Recibí tu solicitud de cita para ${request.services.name} el ${formatBogotaHuman(request.start_time)}. Como es tu primera cita, necesito un anticipo de ${currency.format(request.services.deposit_amount!)} para confirmarla. ¿Me cuentas cómo prefieres pagarlo?`
+    ? `¡Hola ${request.clients.name}! Recibí tu solicitud de cita para ${request.services.name} el ${formatBogotaHuman(request.start_time)}. Como es tu primera cita, necesito un anticipo de ${formatCOP(request.services.deposit_amount!)} para confirmarla. ¿Me cuentas cómo prefieres pagarlo?`
     : `¡Hola ${request.clients.name}! Recibí tu solicitud de cita para ${request.services.name} el ${formatBogotaHuman(request.start_time)}. Te confirmo en breve.`;
 
   return (

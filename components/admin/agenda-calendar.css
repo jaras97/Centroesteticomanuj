@@ -1,0 +1,68 @@
+.agenda-fc {
+  --fc-border-color: theme('colors.gray.200');
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: theme('colors.gray.50');
+  --fc-today-bg-color: rgb(115 157 170 / 0.08);
+  --fc-now-indicator-color: theme('colors.brand.teal-dark');
+  font-family: inherit;
+}
+
+.agenda-fc .fc-col-header-cell {
+  background: theme('colors.white');
+  padding: 0.5rem 0;
+}
+
+.agenda-fc .fc-col-header-cell-cushion {
+  color: theme('colors.brand.ink');
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.agenda-fc .fc-timegrid-slot-label-cushion {
+  font-size: 0.7rem;
+  color: theme('colors.gray.400');
+}
+
+.agenda-fc .fc-timegrid-event {
+  border-radius: 0.375rem;
+  border-width: 0;
+  padding: 1px 2px;
+  box-shadow: none;
+}
+
+.agenda-fc .fc-timegrid-event .fc-event-main {
+  padding: 2px 4px;
+}
+
+.agenda-fc .fc-event-title,
+.agenda-fc .fc-event-time {
+  font-size: 0.7rem;
+  line-height: 1.1;
+}
+
+.agenda-fc .fc-timegrid-col.fc-day-today {
+  background: var(--fc-today-bg-color);
+}
+
+/* Densidad (zoom): alto de cada franja horaria + ancho mínimo de columna */
+.agenda-fc[data-density='compacta'] .fc-timegrid-slot {
+  height: 1.25rem;
+}
+.agenda-fc[data-density='compacta'] .fc-timegrid-col {
+  min-width: 110px;
+}
+
+.agenda-fc[data-density='media'] .fc-timegrid-slot {
+  height: 2rem;
+}
+.agenda-fc[data-density='media'] .fc-timegrid-col {
+  min-width: 150px;
+}
+
+.agenda-fc[data-density='amplia'] .fc-timegrid-slot {
+  height: 3rem;
+}
+.agenda-fc[data-density='amplia'] .fc-timegrid-col {
+  min-width: 190px;
+}

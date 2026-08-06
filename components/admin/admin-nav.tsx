@@ -2,17 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LogOut } from 'lucide-react';
+import { CalendarDays, CalendarPlus, Clock, Inbox, LogOut, Tag, Users } from 'lucide-react';
 import { signOut } from '@/app/admin/(dashboard)/actions';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const LINKS = [
-  { href: '/admin', label: 'Bandeja' },
-  { href: '/admin/agenda', label: 'Agenda' },
-  { href: '/admin/reservar', label: 'Nueva cita' },
-  { href: '/admin/horarios', label: 'Horarios' },
-  { href: '/admin/clientes', label: 'Clientes' },
+  { href: '/admin', label: 'Bandeja', icon: Inbox },
+  { href: '/admin/agenda', label: 'Agenda', icon: CalendarDays },
+  { href: '/admin/reservar', label: 'Nueva cita', icon: CalendarPlus },
+  { href: '/admin/horarios', label: 'Horarios', icon: Clock },
+  { href: '/admin/servicios', label: 'Servicios', icon: Tag },
+  { href: '/admin/clientes', label: 'Clientes', icon: Users },
 ];
 
 export default function AdminNav({ email }: { email: string }) {
@@ -28,12 +29,13 @@ export default function AdminNav({ email }: { email: string }) {
               key={link.href}
               href={link.href}
               className={cn(
-                'shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
+                'flex items-center gap-1.5 shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
                 pathname === link.href
                   ? 'bg-brand-teal/10 text-brand-teal'
                   : 'text-gray-500 hover:text-brand-ink',
               )}
             >
+              <link.icon className='h-4 w-4' />
               {link.label}
             </Link>
           ))}

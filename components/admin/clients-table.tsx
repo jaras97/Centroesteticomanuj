@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Users } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -7,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import EmptyState from '@/components/admin/empty-state';
 import { formatBogotaHuman } from '@/lib/booking/timezone';
 import { isBirthdaySoon } from '@/lib/booking/birthdays';
 
@@ -22,7 +24,7 @@ export interface ClientRow {
 
 export default function ClientsTable({ clients }: { clients: ClientRow[] }) {
   if (clients.length === 0) {
-    return <p className='text-gray-500'>Todavía no hay clientes registrados.</p>;
+    return <EmptyState icon={Users} message='Todavía no hay clientes registrados.' />;
   }
 
   return (

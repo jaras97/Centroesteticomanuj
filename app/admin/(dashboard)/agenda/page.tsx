@@ -1,3 +1,4 @@
+import { CalendarDays } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import {
   addDaysToDateStr,
@@ -6,19 +7,20 @@ import {
   mondayOfWeek,
   toBogotaWallClock,
 } from '@/lib/booking/timezone';
-import AgendaWeekView, {
+import AgendaCalendar, {
   type AgendaAppointment,
   type AgendaBlockedSlot,
-} from '@/components/admin/agenda-week-view';
+} from '@/components/admin/agenda-calendar';
 
 export default async function AgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ week?: string }>;
+  searchParams: Promise<{ date?: string }>;
 }) {
-  const { week } = await searchParams;
+  const { date } = await searchParams;
   const todayStr = formatDateStr(toBogotaWallClock(new Date()));
-  const monday = mondayOfWeek(week || todayStr);
+  const focusedDate = date || todayStr;
+  const monday = mondayOfWeek(focusedDate);
   const nextMonday = addDaysToDateStr(monday, 7);
 
   const weekStartUtc = bogotaWallTimeToUtc(monday, '00:00');
@@ -45,10 +47,14 @@ export default async function AgendaPage({
   return (
     <div>
       <div className='flex items-center justify-between mb-6'>
-        <h1 className='text-2xl font-bold text-brand-ink'>Agenda</h1>
+        <h1 className='flex items-center gap-2 text-2xl font-bold text-brand-ink'>
+          <CalendarDays className='h-6 w-6 text-brand-teal' />
+          Agenda
+        </h1>
       </div>
-      <AgendaWeekView
+      <AgendaCalendar
         monday={monday}
+        focusedDate={focusedDate}
         appointments={(appointments ?? []) as unknown as AgendaAppointment[]}
         blockedSlots={(blockedSlots ?? []) as AgendaBlockedSlot[]}
       />

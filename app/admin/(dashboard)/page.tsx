@@ -1,8 +1,11 @@
+import { Cake, CalendarCheck, Inbox, type LucideIcon } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import SolicitudCard, { type SolicitudRow } from '@/components/admin/solicitud-card';
+import UpcomingBirthdays from '@/components/admin/upcoming-birthdays';
+import EmptyState from '@/components/admin/empty-state';
 import { Card, CardContent } from '@/components/ui/card';
 import { bogotaWallTimeToUtc, formatDateStr, toBogotaWallClock } from '@/lib/booking/timezone';
-import { isBirthdaySoon } from '@/lib/booking/birthdays';
+import { daysUntilNextBirthday, isBirthdaySoon } from '@/lib/booking/birthdays';
 
 export default async function BandejaPage() {
   const supabase = await createClient();
@@ -24,7 +27,7 @@ export default async function BandejaPage() {
         .gte('start_time', todayStartUtc.toISOString())
         .lte('start_time', todayEndUtc.toISOString())
         .in('status', ['CONFIRMADA', 'COMPLETADA']),
-      supabase.from('clients').select('birthday').not('birthday', 'is', null),
+      supabase.from('clients').select('id, name, birthday').not('birthday', 'is', null),
     ]);
 
   const rows = (requests ?? []) as unknown as SolicitudRow[];
@@ -44,43 +47,68 @@ export default async function BandejaPage() {
     isBirthdaySoon(c.birthday, 7),
   ).length;
 
+  const upcomingBirthdays = (clientsWithBirthday ?? [])
+    .map((c) => ({ id: c.id, name: c.name, birthday: c.birthday as string, daysUntil: daysUntilNextBirthday(c.birthday as string) }))
+    .sort((a, b) => a.daysUntil - b.daysUntil)
+    .slice(0, 6);
+
   return (
     <div>
-      <h1 className='text-2xl font-bold text-brand-ink mb-6'>
+      <h1 className='flex items-center gap-2 text-2xl font-bold text-brand-ink mb-6'>
+        <Inbox className='h-6 w-6 text-brand-teal' />
         Bandeja de solicitudes
       </h1>
 
       <div className='grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8'>
-        <SummaryCard label='Solicitudes pendientes' value={rows.length} />
-        <SummaryCard label='Citas de hoy' value={todayCount ?? 0} />
-        <SummaryCard label='Cumpleaños esta semana' value={birthdaysThisWeek} />
+        <SummaryCard icon={Inbox} label='Solicitudes pendientes' value={rows.length} />
+        <SummaryCard icon={CalendarCheck} label='Citas de hoy' value={todayCount ?? 0} />
+        <SummaryCard icon={Cake} label='Cumpleaños esta semana' value={birthdaysThisWeek} />
       </div>
 
-      {rows.length === 0 ? (
-        <p className='text-gray-500'>No hay solicitudes pendientes.</p>
-      ) : (
-        <div className='space-y-4'>
-          {rows.map((request) => (
-            <SolicitudCard
-              key={request.id}
-              request={request}
-              isNewClient={!completedClientIds.has(request.client_id)}
-            />
-          ))}
-        </div>
-      )}
+      <div className='grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 items-start'>
+        {rows.length === 0 ? (
+          <Card>
+            <CardContent className='p-5'>
+              <EmptyState icon={Inbox} message='No hay solicitudes pendientes.' />
+            </CardContent>
+          </Card>
+        ) : (
+          <div className='space-y-4'>
+            {rows.map((request) => (
+              <SolicitudCard
+                key={request.id}
+                request={request}
+                isNewClient={!completedClientIds.has(request.client_id)}
+              />
+            ))}
+          </div>
+        )}
+
+        <UpcomingBirthdays rows={upcomingBirthdays} />
+      </div>
     </div>
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
+function SummaryCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+}) {
   return (
     <Card>
-      <CardContent className='p-5'>
-        <p className='text-sm text-gray-500'>{label}</p>
-        <p className='text-3xl font-bold bg-gradient-to-r from-brand-teal to-brand-teal-dark bg-clip-text text-transparent'>
-          {value}
-        </p>
+      <CardContent className='p-5 flex items-start justify-between gap-3'>
+        <div>
+          <p className='text-sm text-gray-500'>{label}</p>
+          <p className='text-3xl font-bold bg-gradient-to-r from-brand-teal to-brand-teal-dark bg-clip-text text-transparent'>
+            {value}
+          </p>
+        </div>
+        <Icon className='h-5 w-5 text-brand-teal/40 shrink-0' />
       </CardContent>
     </Card>
   );

@@ -1,3 +1,4 @@
+import { Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import ClientsTable, { type ClientRow } from '@/components/admin/clients-table';
 
@@ -34,7 +35,10 @@ export default async function ClientesPage() {
 
   return (
     <div>
-      <h1 className='text-2xl font-bold text-brand-ink mb-6'>Clientes</h1>
+      <h1 className='flex items-center gap-2 text-2xl font-bold text-brand-ink mb-6'>
+        <Users className='h-6 w-6 text-brand-teal' />
+        Clientes
+      </h1>
       <ClientsTable clients={rows} />
     </div>
   );

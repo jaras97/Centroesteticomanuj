@@ -19,3 +19,21 @@ export function isBirthdaySoon(birthday: string | null, withinDays = 30, now: Da
   if (!birthday) return false;
   return daysUntilNextBirthday(birthday, now) <= withinDays;
 }
+
+const MONTHS_ES_LONG = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+];
+
+/** Formatea 'YYYY-MM-DD' como "15 de marzo" (ignora el año). */
+export function formatBirthdayDate(birthday: string): string {
+  const [, month, day] = birthday.split('-').map(Number);
+  return `${day} de ${MONTHS_ES_LONG[month - 1]}`;
+}
+
+/** Etiqueta relativa en español para un número de días hasta el próximo cumpleaños. */
+export function birthdayRelativeLabel(daysUntil: number): string {
+  if (daysUntil === 0) return '¡Hoy! 🎉';
+  if (daysUntil === 1) return 'Mañana';
+  return `En ${daysUntil} días`;
+}
