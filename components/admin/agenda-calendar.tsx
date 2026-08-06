@@ -51,6 +51,33 @@ function toFakeUtcIso(iso: string): string {
   return toBogotaWallClock(new Date(iso)).toISOString();
 }
 
+// Ventana por defecto del calendario — nunca se achica, solo se expande si hay
+// una cita o bloqueo fuera de este rango (ver `slotMinTime`/`slotMaxTime` más abajo).
+const DEFAULT_MIN_MINUTES = 7 * 60; // 07:00
+const DEFAULT_MAX_MINUTES = 21 * 60; // 21:00
+
+function minutesOfDay(fakeUtcIso: string): number {
+  const d = new Date(fakeUtcIso);
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
+}
+
+function floorToHour(minutes: number): number {
+  return Math.floor(minutes / 60) * 60;
+}
+
+function ceilToHour(minutes: number): number {
+  return Math.ceil(minutes / 60) * 60;
+}
+
+function formatMinutesAsTime(minutes: number): string {
+  const clamped = Math.max(0, Math.min(24 * 60, minutes));
+  const hh = Math.floor(clamped / 60)
+    .toString()
+    .padStart(2, '0');
+  const mm = (clamped % 60).toString().padStart(2, '0');
+  return `${hh}:${mm}:00`;
+}
+
 export default function AgendaCalendar({
   monday,
   focusedDate,
@@ -99,6 +126,28 @@ export default function AgendaCalendar({
     }));
 
     return [...appointmentEvents, ...blockedEvents];
+  }, [appointments, blockedSlots]);
+
+  // Rango de horas visible: por defecto 07:00-21:00, pero se expande automáticamente
+  // si hay una cita o bloqueo fuera de esa ventana (ej. agendado manualmente por el
+  // admin fuera del horario publicado), para que nunca quede invisible en el calendario.
+  const { slotMinTime, slotMaxTime } = useMemo(() => {
+    let minMinutes = DEFAULT_MIN_MINUTES;
+    let maxMinutes = DEFAULT_MAX_MINUTES;
+
+    for (const appointment of appointments) {
+      minMinutes = Math.min(minMinutes, floorToHour(minutesOfDay(toFakeUtcIso(appointment.start_time))));
+      maxMinutes = Math.max(maxMinutes, ceilToHour(minutesOfDay(toFakeUtcIso(appointment.end_time))));
+    }
+    for (const block of blockedSlots) {
+      minMinutes = Math.min(minMinutes, floorToHour(minutesOfDay(toFakeUtcIso(block.start_at))));
+      maxMinutes = Math.max(maxMinutes, ceilToHour(minutesOfDay(toFakeUtcIso(block.end_at))));
+    }
+
+    return {
+      slotMinTime: formatMinutesAsTime(minMinutes),
+      slotMaxTime: formatMinutesAsTime(maxMinutes),
+    };
   }, [appointments, blockedSlots]);
 
   function handleEventClick(arg: EventClickArg) {
@@ -192,8 +241,8 @@ export default function AgendaCalendar({
             headerToolbar={false}
             dayHeaderFormat={{ weekday: 'short', day: 'numeric' }}
             firstDay={1}
-            slotMinTime='07:00:00'
-            slotMaxTime='21:00:00'
+            slotMinTime={slotMinTime}
+            slotMaxTime={slotMaxTime}
             allDaySlot={false}
             nowIndicator
             height='auto'
