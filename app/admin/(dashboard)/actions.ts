@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { evaluateAndGrantLoyaltyReward, getAvailableRewards as getAvailableRewardsForClient } from '@/lib/booking/loyalty';
 
 async function requireUser() {
   const supabase = await createClient();
@@ -95,17 +96,61 @@ export async function rejectAppointment(id: string, reason?: string) {
   return { ok: true };
 }
 
-export async function markCompleted(id: string) {
+export async function getAvailableRewards(clientId: string) {
   const supabase = await requireUser();
+  return getAvailableRewardsForClient(supabase, clientId);
+}
+
+export async function completeAppointment(
+  id: string,
+  input: { chargedAmount: number; paymentMethod?: string; appliedRewardId?: string },
+) {
+  const supabase = await requireUser();
+
+  const { data: appointment } = await supabase
+    .from('appointments')
+    .select('client_id')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!appointment) return { ok: false, error: 'Cita no encontrada.' };
+
+  if (input.appliedRewardId) {
+    const { data: reward } = await supabase
+      .from('loyalty_rewards')
+      .select('id, client_id, used_at')
+      .eq('id', input.appliedRewardId)
+      .maybeSingle();
+
+    if (!reward || reward.client_id !== appointment.client_id || reward.used_at) {
+      return { ok: false, error: 'Ese cupón ya no está disponible.' };
+    }
+
+    const { error: rewardError } = await supabase
+      .from('loyalty_rewards')
+      .update({ used_at: new Date().toISOString(), used_appointment_id: id })
+      .eq('id', input.appliedRewardId);
+
+    if (rewardError) return { ok: false, error: 'No se pudo aplicar el cupón.' };
+  }
+
   const { error } = await supabase
     .from('appointments')
-    .update({ status: 'COMPLETADA' })
+    .update({
+      status: 'COMPLETADA',
+      charged_amount: input.chargedAmount,
+      payment_method: input.paymentMethod || null,
+    })
     .eq('id', id);
 
   if (error) return { ok: false, error: 'No se pudo actualizar la cita.' };
 
+  const { granted } = await evaluateAndGrantLoyaltyReward(supabase, appointment.client_id, id);
+
   revalidateBooking();
-  return { ok: true };
+  revalidatePath('/admin/finanzas');
+  revalidatePath(`/admin/clientes/${appointment.client_id}`);
+  return { ok: true, loyaltyGranted: granted };
 }
 
 export async function markNoShow(id: string) {
@@ -442,6 +487,72 @@ export async function setServiceActive(id: string, active: boolean) {
   if (error) return { ok: false, error: 'No se pudo actualizar el servicio.' };
 
   revalidateServices();
+  return { ok: true };
+}
+
+interface ExpenseInput {
+  expenseDate: string;
+  category: string;
+  description?: string;
+  amount: number;
+}
+
+function revalidateFinanzas() {
+  revalidatePath('/admin/finanzas');
+}
+
+export async function createExpense(input: ExpenseInput) {
+  const supabase = await requireUser();
+
+  if (!input.category.trim()) return { ok: false, error: 'La categoría es obligatoria.' };
+  if (!input.amount || input.amount <= 0) {
+    return { ok: false, error: 'El monto debe ser mayor a cero.' };
+  }
+
+  const { error } = await supabase.from('expenses').insert({
+    expense_date: input.expenseDate,
+    category: input.category.trim(),
+    description: input.description?.trim() || null,
+    amount: input.amount,
+  });
+
+  if (error) return { ok: false, error: 'No se pudo registrar el gasto.' };
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function updateExpense(id: string, input: ExpenseInput) {
+  const supabase = await requireUser();
+
+  if (!input.category.trim()) return { ok: false, error: 'La categoría es obligatoria.' };
+  if (!input.amount || input.amount <= 0) {
+    return { ok: false, error: 'El monto debe ser mayor a cero.' };
+  }
+
+  const { error } = await supabase
+    .from('expenses')
+    .update({
+      expense_date: input.expenseDate,
+      category: input.category.trim(),
+      description: input.description?.trim() || null,
+      amount: input.amount,
+    })
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar el gasto.' };
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function deleteExpense(id: string) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('expenses').delete().eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo eliminar el gasto.' };
+
+  revalidateFinanzas();
   return { ok: true };
 }
 

@@ -60,6 +60,29 @@ export interface Appointment {
   client_note: string | null;
   reject_reason: string | null;
   expires_at: string | null;
+  charged_amount: number | null;
+  payment_method: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface Expense {
+  id: string;
+  expense_date: string;
+  category: string;
+  description: string | null;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LoyaltyReward {
+  id: string;
+  client_id: string;
+  discount_percent: number;
+  earned_at: string;
+  source_appointment_id: string | null;
+  used_at: string | null;
+  used_appointment_id: string | null;
+  created_at: string;
 }

@@ -15,12 +15,13 @@ import './agenda-calendar.css';
 
 export interface AgendaAppointment {
   id: string;
+  client_id: string;
   status: 'SOLICITADA' | 'ESPERANDO_ANTICIPO' | 'CONFIRMADA' | 'COMPLETADA';
   start_time: string;
   end_time: string;
   duration_min: number;
   clients: { name: string; phone: string };
-  services: { name: string };
+  services: { name: string; price: number | null };
 }
 
 export interface AgendaBlockedSlot {

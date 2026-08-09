@@ -4,7 +4,10 @@ import { ChevronLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { Badge } from '@/components/ui/badge';
 import ClientEditForm from '@/components/admin/client-edit-form';
+import LoyaltyCard from '@/components/admin/loyalty-card';
 import { formatBogotaHuman } from '@/lib/booking/timezone';
+import { getClientLoyaltyStatus } from '@/lib/booking/loyalty';
+import { formatCOP } from '@/lib/format';
 import type { AppointmentStatus, Client } from '@/lib/supabase/types';
 
 const STATUS_VARIANT: Record<
@@ -42,6 +45,8 @@ export default async function ClientDetailPage({
     .eq('client_id', id)
     .order('start_time', { ascending: false });
 
+  const loyaltyStatus = await getClientLoyaltyStatus(supabase, id);
+
   return (
     <div>
       <Link
@@ -75,6 +80,7 @@ export default async function ClientDetailPage({
                   </div>
                   <p className='text-sm text-gray-600'>
                     {formatBogotaHuman(appt.start_time)} · {appt.duration_min} min
+                    {appt.charged_amount != null && ` · ${formatCOP(appt.charged_amount)}`}
                   </p>
                   {appt.requested_name.trim().toLowerCase() !==
                     client.name.trim().toLowerCase() && (
@@ -98,9 +104,12 @@ export default async function ClientDetailPage({
           )}
         </div>
 
-        <div>
-          <h2 className='font-semibold text-brand-ink mb-3'>Datos del cliente</h2>
-          <ClientEditForm client={client as Client} />
+        <div className='space-y-6'>
+          <div>
+            <h2 className='font-semibold text-brand-ink mb-3'>Datos del cliente</h2>
+            <ClientEditForm client={client as Client} />
+          </div>
+          <LoyaltyCard status={loyaltyStatus} />
         </div>
       </div>
     </div>

@@ -7,8 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import RescheduleDialog from '@/components/admin/reschedule-dialog';
+import CompleteAppointmentDialog from '@/components/admin/complete-appointment-dialog';
 import { formatBogotaHuman } from '@/lib/booking/timezone';
-import { markCompleted, markNoShow, deleteBlockedSlot } from '@/app/admin/(dashboard)/actions';
+import { markNoShow, deleteBlockedSlot } from '@/app/admin/(dashboard)/actions';
 import type { AgendaAppointment, AgendaBlockedSlot } from '@/components/admin/agenda-calendar';
 
 export type SelectedAgendaEvent =
@@ -104,24 +105,12 @@ function AppointmentDetail({
         )}
         {isPast && appointment.status === 'CONFIRMADA' && (
           <>
-            <Button
-              size='sm'
-              variant='outline'
-              disabled={isPending}
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await markCompleted(appointment.id);
-                  if (!result.ok) {
-                    toast.error(result.error);
-                    return;
-                  }
-                  onDone();
-                })
-              }
-            >
-              {isPending && <Loader2 className='h-3.5 w-3.5 animate-spin' />}
-              Completada
-            </Button>
+            <CompleteAppointmentDialog
+              appointmentId={appointment.id}
+              clientId={appointment.client_id}
+              defaultAmount={appointment.services.price ?? 0}
+              onDone={onDone}
+            />
             <Button
               size='sm'
               variant='outline'

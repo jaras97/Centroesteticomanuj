@@ -76,3 +76,9 @@ export function formatBogotaHuman(iso: string): string {
   const hour12 = hours % 12 === 0 ? 12 : hours % 12;
   return `${day} ${month} ${year}, ${hour12}:${minutes} ${period}`;
 }
+
+/** Formatea una fecha simple 'YYYY-MM-DD' (sin componente de hora) como "15 ago 2026". */
+export function formatDateStrHuman(date: DateStr): string {
+  const [year, month, day] = date.split('-').map(Number);
+  return `${day} ${MONTHS_ES[month - 1]} ${year}`;
+}

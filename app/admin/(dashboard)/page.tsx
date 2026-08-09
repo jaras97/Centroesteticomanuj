@@ -1,8 +1,9 @@
-import { Cake, CalendarCheck, Inbox, type LucideIcon } from 'lucide-react';
+import { Cake, CalendarCheck, Inbox } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import SolicitudCard, { type SolicitudRow } from '@/components/admin/solicitud-card';
 import UpcomingBirthdays from '@/components/admin/upcoming-birthdays';
 import EmptyState from '@/components/admin/empty-state';
+import SummaryCard from '@/components/admin/summary-card';
 import { Card, CardContent } from '@/components/ui/card';
 import { bogotaWallTimeToUtc, formatDateStr, toBogotaWallClock } from '@/lib/booking/timezone';
 import { daysUntilNextBirthday, isBirthdaySoon } from '@/lib/booking/birthdays';
@@ -87,29 +88,5 @@ export default async function BandejaPage() {
         <UpcomingBirthdays rows={upcomingBirthdays} />
       </div>
     </div>
-  );
-}
-
-function SummaryCard({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: number;
-}) {
-  return (
-    <Card>
-      <CardContent className='p-5 flex items-start justify-between gap-3'>
-        <div>
-          <p className='text-sm text-gray-500'>{label}</p>
-          <p className='text-3xl font-bold bg-gradient-to-r from-brand-teal to-brand-teal-dark bg-clip-text text-transparent'>
-            {value}
-          </p>
-        </div>
-        <Icon className='h-5 w-5 text-brand-teal/40 shrink-0' />
-      </CardContent>
-    </Card>
   );
 }
