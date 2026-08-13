@@ -66,3 +66,27 @@
 .agenda-fc[data-density='amplia'] .fc-timegrid-col {
   min-width: 190px;
 }
+
+/* Vista de mes */
+.agenda-fc .fc-daygrid-day-number {
+  font-size: 0.75rem;
+  color: theme('colors.brand.ink');
+  padding: 0.25rem 0.4rem;
+}
+
+.agenda-fc .fc-day-today .fc-daygrid-day-number {
+  font-weight: 700;
+  color: theme('colors.brand.teal-dark');
+}
+
+.agenda-fc .fc-daygrid-event {
+  border-radius: 0.25rem;
+  border-width: 0;
+  padding: 0 3px;
+  font-size: 0.7rem;
+}
+
+.agenda-fc .fc-daygrid-day-frame {
+  min-height: 5rem;
+  cursor: pointer;
+}

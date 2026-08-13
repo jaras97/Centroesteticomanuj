@@ -45,6 +45,7 @@ export default function AdminBookingForm({ services }: { services: ServiceOption
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [note, setNote] = useState('');
+  const [depositAmount, setDepositAmount] = useState('');
 
   useEffect(() => {
     if (selectedClient || query.trim().length < 2) {
@@ -82,6 +83,7 @@ export default function AdminBookingForm({ services }: { services: ServiceOption
         serviceId,
         startTimeIso,
         note,
+        depositReceivedAmount: depositAmount ? Number(depositAmount) : undefined,
       });
 
       if (!result.ok) {
@@ -194,6 +196,18 @@ export default function AdminBookingForm({ services }: { services: ServiceOption
         No está restringido a los horarios publicados — puedes agendar fuera
         de ellos si ya lo acordaste con la clienta.
       </p>
+
+      <div className='space-y-2'>
+        <Label htmlFor='admin-deposit'>Anticipo/abono recibido (opcional)</Label>
+        <Input
+          id='admin-deposit'
+          type='number'
+          min={0}
+          placeholder='$0'
+          value={depositAmount}
+          onChange={(e) => setDepositAmount(e.target.value)}
+        />
+      </div>
 
       <div className='space-y-2'>
         <Label htmlFor='admin-note'>Nota (opcional)</Label>

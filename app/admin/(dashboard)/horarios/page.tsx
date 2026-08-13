@@ -19,10 +19,17 @@ export default async function HorariosPage() {
         Horarios
       </h1>
       <p className='text-gray-500 mb-6'>
-        Plantilla semanal de disponibilidad. Los cambios se reflejan de
-        inmediato en el calendario de reservas público. Para bloquear un día
-        puntual (ej. un domingo específico) usa &quot;Bloquear horario&quot; en
-        la Agenda, en vez de quitarlo aquí.
+        Esta es la plantilla base: se repite igual cada semana, hacia
+        adelante indefinidamente. Un cambio aquí afecta{' '}
+        <strong className='text-brand-ink'>todas las semanas futuras</strong>,
+        no solo la actual.
+      </p>
+      <p className='text-gray-500 mb-6'>
+        Si <strong className='text-brand-ink'>esta semana en particular</strong>{' '}
+        trabajas menos horas o tienes un día distinto (ej. un domingo
+        específico, una tarde libre), no edites la plantilla — usa
+        &quot;Bloquear horario&quot; en la Agenda para esa fecha puntual. Así
+        la plantilla base queda intacta para las demás semanas.
       </p>
       <AvailabilityEditor windows={(windows ?? []) as Availability[]} />
     </div>

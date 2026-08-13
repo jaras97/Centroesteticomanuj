@@ -2,15 +2,23 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import type { EventClickArg, EventInput } from '@fullcalendar/core';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin, { type DateClickArg } from '@fullcalendar/interaction';
+import type { EventClickArg, EventInput, MoreLinkArg } from '@fullcalendar/core';
 import { ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BlockSlotDialog from '@/components/admin/block-slot-dialog';
 import AgendaEventDialog, { type SelectedAgendaEvent } from '@/components/admin/agenda-event-dialog';
-import { addDaysToDateStr, toBogotaWallClock } from '@/lib/booking/timezone';
+import {
+  addDaysToDateStr,
+  formatDateStr,
+  formatDateStrHuman,
+  toBogotaWallClock,
+  type DateStr,
+} from '@/lib/booking/timezone';
 import './agenda-calendar.css';
 
 export interface AgendaAppointment {
@@ -20,6 +28,7 @@ export interface AgendaAppointment {
   start_time: string;
   end_time: string;
   duration_min: number;
+  deposit_received_amount: number | null;
   clients: { name: string; phone: string };
   services: { name: string; price: number | null };
 }
@@ -79,6 +88,26 @@ function formatMinutesAsTime(minutes: number): string {
   return `${hh}:${mm}:00`;
 }
 
+const MONTHS_ES_FULL = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+];
+
+/** Primero del mes siguiente/anterior al que contiene `date` (navegación por mes). */
+function shiftMonthDateStr(date: DateStr, delta: number): DateStr {
+  const [y, m] = date.split('-').map(Number);
+  const shifted = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}-01`;
+}
+
+type CalendarView = 'timeGridWeek' | 'timeGridDay' | 'dayGridMonth';
+
+const VIEW_LABEL: Record<CalendarView, string> = {
+  timeGridWeek: 'Semana',
+  timeGridDay: 'Día',
+  dayGridMonth: 'Mes',
+};
+
 export default function AgendaCalendar({
   monday,
   focusedDate,
@@ -94,8 +123,11 @@ export default function AgendaCalendar({
   const nextWeek = addDaysToDateStr(monday, 7);
   const prevDay = addDaysToDateStr(focusedDate, -1);
   const nextDay = addDaysToDateStr(focusedDate, 1);
+  const prevMonth = shiftMonthDateStr(focusedDate, -1);
+  const nextMonth = shiftMonthDateStr(focusedDate, 1);
   const calendarRef = useRef<FullCalendar>(null);
-  const [view, setView] = useState<'timeGridWeek' | 'timeGridDay'>('timeGridWeek');
+  const router = useRouter();
+  const [view, setView] = useState<CalendarView>('timeGridWeek');
   const [density, setDensity] = useState<Density>('media');
   const [selectedEvent, setSelectedEvent] = useState<SelectedAgendaEvent | null>(null);
   const now = useMemo(() => new Date(), []);
@@ -109,7 +141,7 @@ export default function AgendaCalendar({
       id: `appt-${appointment.id}`,
       start: toFakeUtcIso(appointment.start_time),
       end: toFakeUtcIso(appointment.end_time),
-      title: `${appointment.clients.name} · ${appointment.services.name}`,
+      title: `${appointment.deposit_received_amount ? '💰 ' : ''}${appointment.clients.name} · ${appointment.services.name}`,
       backgroundColor: STATUS_COLOR[appointment.status],
       borderColor: STATUS_COLOR[appointment.status],
       extendedProps: { kind: 'appointment', appointment },
@@ -169,22 +201,58 @@ export default function AgendaCalendar({
     }
   }
 
-  function changeView(next: 'timeGridWeek' | 'timeGridDay') {
+  function changeView(next: CalendarView) {
     setView(next);
     calendarRef.current?.getApi().changeView(next);
   }
+
+  // Al hacer clic en un día (o en "+N más") en vista Mes, se navega a la
+  // vista Día de ese día en vez de mostrar el popover nativo de FullCalendar
+  // (con muchas citas el mismo día, ese popover se sobreponía al resto de la
+  // UI y era difícil de leer).
+  function goToDay(date: Date) {
+    const dateStr = formatDateStr(date);
+    setView('timeGridDay');
+    calendarRef.current?.getApi().changeView('timeGridDay', dateStr);
+    router.push(`/admin/agenda?date=${dateStr}`);
+  }
+
+  function handleDateClick(arg: DateClickArg) {
+    if (view !== 'dayGridMonth') return;
+    goToDay(arg.date);
+  }
+
+  function handleMoreLinkClick(arg: MoreLinkArg) {
+    goToDay(arg.date);
+    return 'timeGridDay' as const;
+  }
+
+  const [prevHref, nextHref] =
+    view === 'timeGridDay'
+      ? [prevDay, nextDay]
+      : view === 'dayGridMonth'
+        ? [prevMonth, nextMonth]
+        : [prevWeek, nextWeek];
+
+  const [focusedYear, focusedMonth] = focusedDate.split('-').map(Number);
+  const headerLabel =
+    view === 'dayGridMonth'
+      ? `${MONTHS_ES_FULL[focusedMonth - 1]} ${focusedYear}`
+      : view === 'timeGridDay'
+        ? formatDateStrHuman(focusedDate)
+        : `Semana del ${monday}`;
 
   return (
     <div>
       <div className='flex items-center justify-between mb-6 gap-3 flex-wrap'>
         <div className='flex items-center gap-2'>
-          <Link href={`/admin/agenda?date=${view === 'timeGridDay' ? prevDay : prevWeek}`}>
+          <Link href={`/admin/agenda?date=${prevHref}`}>
             <Button variant='outline' size='icon'>
               <ChevronLeft className='h-4 w-4' />
             </Button>
           </Link>
-          <span className='text-sm font-medium text-brand-ink'>Semana del {monday}</span>
-          <Link href={`/admin/agenda?date=${view === 'timeGridDay' ? nextDay : nextWeek}`}>
+          <span className='text-sm font-medium text-brand-ink capitalize'>{headerLabel}</span>
+          <Link href={`/admin/agenda?date=${nextHref}`}>
             <Button variant='outline' size='icon'>
               <ChevronRight className='h-4 w-4' />
             </Button>
@@ -193,7 +261,7 @@ export default function AgendaCalendar({
 
         <div className='flex items-center gap-3 flex-wrap'>
           <div className='flex items-center rounded-md border p-0.5 text-sm'>
-            {(['timeGridWeek', 'timeGridDay'] as const).map((v) => (
+            {(['timeGridWeek', 'timeGridDay', 'dayGridMonth'] as const).map((v) => (
               <button
                 key={v}
                 type='button'
@@ -202,30 +270,32 @@ export default function AgendaCalendar({
                   view === v ? 'bg-brand-teal text-white' : 'text-gray-500 hover:text-brand-ink'
                 }`}
               >
-                {v === 'timeGridWeek' ? 'Semana' : 'Día'}
+                {VIEW_LABEL[v]}
               </button>
             ))}
           </div>
 
-          <div className='flex items-center gap-1 text-sm'>
-            <Button
-              variant='outline'
-              size='icon'
-              disabled={density === 'compacta'}
-              onClick={() => setDensity(DENSITIES[DENSITIES.indexOf(density) - 1])}
-            >
-              <Minus className='h-3.5 w-3.5' />
-            </Button>
-            <span className='w-16 text-center text-gray-500'>{DENSITY_LABEL[density]}</span>
-            <Button
-              variant='outline'
-              size='icon'
-              disabled={density === 'amplia'}
-              onClick={() => setDensity(DENSITIES[DENSITIES.indexOf(density) + 1])}
-            >
-              <Plus className='h-3.5 w-3.5' />
-            </Button>
-          </div>
+          {view !== 'dayGridMonth' && (
+            <div className='flex items-center gap-1 text-sm'>
+              <Button
+                variant='outline'
+                size='icon'
+                disabled={density === 'compacta'}
+                onClick={() => setDensity(DENSITIES[DENSITIES.indexOf(density) - 1])}
+              >
+                <Minus className='h-3.5 w-3.5' />
+              </Button>
+              <span className='w-16 text-center text-gray-500'>{DENSITY_LABEL[density]}</span>
+              <Button
+                variant='outline'
+                size='icon'
+                disabled={density === 'amplia'}
+                onClick={() => setDensity(DENSITIES[DENSITIES.indexOf(density) + 1])}
+              >
+                <Plus className='h-3.5 w-3.5' />
+              </Button>
+            </div>
+          )}
 
           <BlockSlotDialog />
         </div>
@@ -235,7 +305,7 @@ export default function AgendaCalendar({
         <div className='agenda-fc' data-density={density}>
           <FullCalendar
             ref={calendarRef}
-            plugins={[timeGridPlugin, interactionPlugin]}
+            plugins={[timeGridPlugin, dayGridPlugin, interactionPlugin]}
             initialView='timeGridWeek'
             initialDate={focusedDate}
             timeZone='UTC'
@@ -247,8 +317,11 @@ export default function AgendaCalendar({
             allDaySlot={false}
             nowIndicator
             height='auto'
+            dayMaxEvents={3}
             events={events}
             eventClick={handleEventClick}
+            dateClick={handleDateClick}
+            moreLinkClick={handleMoreLinkClick}
           />
         </div>
       </div>

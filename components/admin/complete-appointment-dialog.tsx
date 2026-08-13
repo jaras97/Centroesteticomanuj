@@ -25,11 +25,13 @@ export default function CompleteAppointmentDialog({
   appointmentId,
   clientId,
   defaultAmount,
+  depositReceivedAmount,
   onDone,
 }: {
   appointmentId: string;
   clientId: string;
   defaultAmount: number;
+  depositReceivedAmount?: number | null;
   onDone: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -93,6 +95,12 @@ export default function CompleteAppointmentDialog({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />
+              {!!depositReceivedAmount && (
+                <p className='text-sm text-gray-500'>
+                  Ya recibió un anticipo de {formatCOP(depositReceivedAmount)} → saldo pendiente
+                  hoy: <span className='font-medium text-brand-ink'>{formatCOP(Math.max(baseAmount - depositReceivedAmount, 0))}</span>
+                </p>
+              )}
             </div>
 
             <div className='space-y-2'>

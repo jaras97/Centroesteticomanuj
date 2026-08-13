@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import RescheduleDialog from '@/components/admin/reschedule-dialog';
 import CompleteAppointmentDialog from '@/components/admin/complete-appointment-dialog';
 import { formatBogotaHuman } from '@/lib/booking/timezone';
+import { formatCOP } from '@/lib/format';
 import { markNoShow, deleteBlockedSlot } from '@/app/admin/(dashboard)/actions';
 import type { AgendaAppointment, AgendaBlockedSlot } from '@/components/admin/agenda-calendar';
 
@@ -94,6 +95,11 @@ function AppointmentDetail({
           {formatBogotaHuman(appointment.start_time)} · {appointment.duration_min} min
         </p>
         <p className='text-gray-500'>{appointment.clients.phone}</p>
+        {!!appointment.deposit_received_amount && (
+          <p className='text-emerald-700 font-medium'>
+            💰 Anticipo recibido: {formatCOP(appointment.deposit_received_amount)}
+          </p>
+        )}
       </div>
 
       <div className='flex flex-wrap gap-2 pt-2'>
@@ -109,6 +115,7 @@ function AppointmentDetail({
               appointmentId={appointment.id}
               clientId={appointment.client_id}
               defaultAmount={appointment.services.price ?? 0}
+              depositReceivedAmount={appointment.deposit_received_amount}
               onDone={onDone}
             />
             <Button

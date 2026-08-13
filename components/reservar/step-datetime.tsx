@@ -57,8 +57,8 @@ export default function StepDateTime({
         </div>
       ) : availability.length === 0 ? (
         <p className='text-center text-gray-600 py-8'>
-          No hay horarios disponibles para este servicio en las próximas
-          semanas. Escríbenos por WhatsApp para revisar otras opciones.
+          No hay horarios disponibles para este servicio en los próximos
+          meses. Escríbenos por WhatsApp para revisar otras opciones.
         </p>
       ) : (
         <div className='grid gap-8 sm:grid-cols-2'>

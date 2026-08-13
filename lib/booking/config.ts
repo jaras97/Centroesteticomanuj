@@ -4,8 +4,8 @@
 /** Horas mínimas de antelación para poder reservar. */
 export const LEAD_TIME_HOURS = 12;
 
-/** Semanas máximas a futuro que se pueden reservar. */
-export const BOOKING_HORIZON_WEEKS = 4;
+/** Semanas máximas a futuro que se pueden reservar (~4 meses). */
+export const BOOKING_HORIZON_WEEKS = 18;
 
 /** Horas antes de que una solicitud sin confirmar se libere automáticamente. */
 export const REQUEST_EXPIRATION_HOURS = 24;

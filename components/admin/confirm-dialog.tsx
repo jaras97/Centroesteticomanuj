@@ -28,11 +28,16 @@ export default function ConfirmDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [duration, setDuration] = useState(String(defaultDuration));
+  const [depositAmount, setDepositAmount] = useState('');
   const [isPending, startTransition] = useTransition();
 
   function handleConfirm() {
     startTransition(async () => {
-      const result = await confirmAppointment(appointmentId, Number(duration));
+      const result = await confirmAppointment(
+        appointmentId,
+        Number(duration),
+        depositAmount ? Number(depositAmount) : undefined,
+      );
       if (!result.ok) {
         toast.error(result.error);
         return;
@@ -67,6 +72,20 @@ export default function ConfirmDialog({
             onChange={(e) => setDuration(e.target.value)}
           />
         </div>
+
+        {!willRequireDeposit && (
+          <div className='space-y-2'>
+            <Label htmlFor='deposit-amount'>Anticipo/abono recibido (opcional)</Label>
+            <Input
+              id='deposit-amount'
+              type='number'
+              min={0}
+              placeholder='$0'
+              value={depositAmount}
+              onChange={(e) => setDepositAmount(e.target.value)}
+            />
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant='outline' onClick={() => setOpen(false)}>

@@ -82,6 +82,11 @@ export default async function ClientDetailPage({
                     {formatBogotaHuman(appt.start_time)} · {appt.duration_min} min
                     {appt.charged_amount != null && ` · ${formatCOP(appt.charged_amount)}`}
                   </p>
+                  {appt.deposit_received_amount != null && (
+                    <p className='text-sm text-emerald-700 mt-1'>
+                      💰 Anticipo recibido: {formatCOP(appt.deposit_received_amount)}
+                    </p>
+                  )}
                   {appt.requested_name.trim().toLowerCase() !==
                     client.name.trim().toLowerCase() && (
                     <p className='text-sm text-amber-600 mt-1'>

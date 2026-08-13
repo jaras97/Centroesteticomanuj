@@ -60,6 +60,7 @@ export interface Appointment {
   client_note: string | null;
   reject_reason: string | null;
   expires_at: string | null;
+  deposit_received_amount: number | null;
   charged_amount: number | null;
   payment_method: string | null;
   created_at: string;

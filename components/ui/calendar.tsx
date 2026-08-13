@@ -14,11 +14,11 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
       showOutsideDays={showOutsideDays}
       className={cn('p-3', className)}
       classNames={{
-        months: 'flex flex-col sm:flex-row gap-2',
+        months: 'flex flex-col sm:flex-row gap-2 relative',
         month: 'flex flex-col gap-4',
         month_caption: 'flex justify-center pt-1 relative items-center w-full',
         caption_label: 'text-sm font-medium text-brand-ink',
-        nav: 'flex items-center justify-between absolute inset-x-1 top-1',
+        nav: 'flex items-center justify-between absolute inset-x-1 top-1 z-10',
         button_previous: cn(
           buttonVariants({ variant: 'outline' }),
           'h-7 w-7 bg-transparent p-0 opacity-70 hover:opacity-100',

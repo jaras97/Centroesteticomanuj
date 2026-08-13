@@ -22,6 +22,7 @@ function revalidateBooking() {
 export async function confirmAppointment(
   id: string,
   durationMinOverride?: number,
+  depositReceivedAmount?: number,
 ) {
   const supabase = await requireUser();
 
@@ -53,12 +54,20 @@ export async function confirmAppointment(
     ? new Date(Date.now() + 24 * 60 * 60_000).toISOString()
     : null;
 
+  // Si la cita queda esperando el anticipo obligatorio, el monto todavía no
+  // se ha recibido — se registra después vía markDepositReceived.
+  const depositToStore =
+    !requiresDeposit && depositReceivedAmount && depositReceivedAmount > 0
+      ? depositReceivedAmount
+      : undefined;
+
   const { error } = await supabase
     .from('appointments')
     .update({
       status: requiresDeposit ? 'ESPERANDO_ANTICIPO' : 'CONFIRMADA',
       duration_min: durationMin,
       expires_at: expiresAt,
+      ...(depositToStore !== undefined && { deposit_received_amount: depositToStore }),
     })
     .eq('id', id);
 
@@ -68,12 +77,17 @@ export async function confirmAppointment(
   return { ok: true };
 }
 
-export async function markDepositReceived(id: string) {
+export async function markDepositReceived(id: string, depositReceivedAmount?: number) {
   const supabase = await requireUser();
 
   const { error } = await supabase
     .from('appointments')
-    .update({ status: 'CONFIRMADA', expires_at: null })
+    .update({
+      status: 'CONFIRMADA',
+      expires_at: null,
+      ...(depositReceivedAmount &&
+        depositReceivedAmount > 0 && { deposit_received_amount: depositReceivedAmount }),
+    })
     .eq('id', id);
 
   if (error) return { ok: false, error: 'No se pudo actualizar la cita.' };
@@ -262,6 +276,7 @@ export async function createManualAppointment(input: {
   serviceId: string;
   startTimeIso: string;
   note?: string;
+  depositReceivedAmount?: number;
 }) {
   const supabase = await requireUser();
 
@@ -322,6 +337,10 @@ export async function createManualAppointment(input: {
     buffer_min: service.buffer_min,
     requested_name: client.name,
     client_note: input.note || null,
+    deposit_received_amount:
+      input.depositReceivedAmount && input.depositReceivedAmount > 0
+        ? input.depositReceivedAmount
+        : null,
   });
 
   if (appointmentError) {

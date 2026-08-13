@@ -6,11 +6,22 @@ import {
   formatDateStr,
   mondayOfWeek,
   toBogotaWallClock,
+  type DateStr,
 } from '@/lib/booking/timezone';
 import AgendaCalendar, {
   type AgendaAppointment,
   type AgendaBlockedSlot,
 } from '@/components/admin/agenda-calendar';
+
+function firstDayOfMonth(date: DateStr): DateStr {
+  return `${date.slice(0, 7)}-01`;
+}
+
+function lastDayOfMonth(date: DateStr): DateStr {
+  const [y, m] = date.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${date.slice(0, 7)}-${String(lastDay).padStart(2, '0')}`;
+}
 
 export default async function AgendaPage({
   searchParams,
@@ -21,10 +32,16 @@ export default async function AgendaPage({
   const todayStr = formatDateStr(toBogotaWallClock(new Date()));
   const focusedDate = date || todayStr;
   const monday = mondayOfWeek(focusedDate);
-  const nextMonday = addDaysToDateStr(monday, 7);
 
-  const weekStartUtc = bogotaWallTimeToUtc(monday, '00:00');
-  const weekEndUtc = bogotaWallTimeToUtc(nextMonday, '00:00');
+  // Se trae siempre el rango completo de la grilla del mes que contiene
+  // focusedDate (superset de cualquier semana/día dentro de ese mes), así
+  // el toggle Semana/Día/Mes es instantáneo en el cliente sin ida y vuelta
+  // al servidor — solo cambiar de mes (flechas) dispara un nuevo fetch.
+  const gridStart = mondayOfWeek(firstDayOfMonth(focusedDate));
+  const gridEndExclusive = addDaysToDateStr(mondayOfWeek(lastDayOfMonth(focusedDate)), 7);
+
+  const gridStartUtc = bogotaWallTimeToUtc(gridStart, '00:00');
+  const gridEndUtc = bogotaWallTimeToUtc(gridEndExclusive, '00:00');
 
   const supabase = await createClient();
 
@@ -32,15 +49,15 @@ export default async function AgendaPage({
     supabase
       .from('appointments')
       .select('*, clients(*), services(*)')
-      .gte('start_time', weekStartUtc.toISOString())
-      .lt('start_time', weekEndUtc.toISOString())
+      .gte('start_time', gridStartUtc.toISOString())
+      .lt('start_time', gridEndUtc.toISOString())
       .in('status', ['SOLICITADA', 'ESPERANDO_ANTICIPO', 'CONFIRMADA', 'COMPLETADA'])
       .order('start_time', { ascending: true }),
     supabase
       .from('blocked_slots')
       .select('*')
-      .lt('start_at', weekEndUtc.toISOString())
-      .gt('end_at', weekStartUtc.toISOString())
+      .lt('start_at', gridEndUtc.toISOString())
+      .gt('end_at', gridStartUtc.toISOString())
       .order('start_at', { ascending: true }),
   ]);
 

@@ -8,6 +8,9 @@ import SummaryCard from '@/components/admin/summary-card';
 import ExpensesTable from '@/components/admin/expenses-table';
 import ExpenseFormDialog from '@/components/admin/expense-form-dialog';
 import RevenueChart, { type DailyRevenuePoint } from '@/components/admin/revenue-chart';
+import ServiceBreakdownCard, {
+  type ServiceBreakdownRow,
+} from '@/components/admin/service-breakdown-card';
 import { formatCOP } from '@/lib/format';
 import {
   addDaysToDateStr,
@@ -54,6 +57,7 @@ export default async function FinanzasPage({
     { data: nonCompletedAppointments },
     { data: expenses },
     { data: todayAppointments },
+    { data: allTimeCompletedAppointments },
   ] = await Promise.all([
     supabase
       .from('appointments')
@@ -79,6 +83,10 @@ export default async function FinanzasPage({
       .eq('status', 'COMPLETADA')
       .gte('start_time', bogotaWallTimeToUtc(todayStr, '00:00').toISOString())
       .lt('start_time', bogotaWallTimeToUtc(addDaysToDateStr(todayStr, 1), '00:00').toISOString()),
+    supabase
+      .from('appointments')
+      .select('charged_amount, service_id, services(name)')
+      .eq('status', 'COMPLETADA'),
   ]);
 
   const completed = (completedAppointments ?? []) as unknown as Array<{
@@ -114,7 +122,29 @@ export default async function FinanzasPage({
     entry.count += 1;
     byService.set(key, entry);
   }
-  const revenueByService = [...byService.values()].sort((a, b) => b.total - a.total);
+  const revenueByService: ServiceBreakdownRow[] = [...byService.values()].sort(
+    (a, b) => b.total - a.total,
+  );
+
+  // Ingresos por servicio, histórico (todas las citas completadas, sin filtro de mes).
+  const byServiceAllTime = new Map<string, ServiceBreakdownRow>();
+  for (const a of (allTimeCompletedAppointments ?? []) as unknown as Array<{
+    charged_amount: number | null;
+    service_id: string;
+    services: { name: string } | null;
+  }>) {
+    const entry = byServiceAllTime.get(a.service_id) ?? {
+      name: a.services?.name ?? 'Servicio',
+      total: 0,
+      count: 0,
+    };
+    entry.total += a.charged_amount ?? 0;
+    entry.count += 1;
+    byServiceAllTime.set(a.service_id, entry);
+  }
+  const revenueByServiceAllTime = [...byServiceAllTime.values()].sort(
+    (a, b) => b.total - a.total,
+  );
 
   // Tendencia diaria.
   const dailyMap = new Map<number, number>();
@@ -211,27 +241,7 @@ export default async function FinanzasPage({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className='text-lg font-semibold'>Ingresos por servicio</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {revenueByService.length === 0 ? (
-                <p className='text-sm text-gray-500'>No hay citas completadas con monto en este mes.</p>
-              ) : (
-                <div className='space-y-3'>
-                  {revenueByService.map((s) => (
-                    <div key={s.name} className='flex items-center justify-between text-sm'>
-                      <span className='text-brand-ink font-medium'>
-                        {s.name} <span className='text-gray-400 font-normal'>({s.count})</span>
-                      </span>
-                      <span className='text-gray-600'>{formatCOP(s.total)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ServiceBreakdownCard monthData={revenueByService} allTimeData={revenueByServiceAllTime} />
         </TabsContent>
 
         <TabsContent value='gastos'>

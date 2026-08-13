@@ -86,7 +86,10 @@ export default function SolicitudCard({
             />
           )}
           {request.status === 'ESPERANDO_ANTICIPO' && (
-            <DepositReceivedButton appointmentId={request.id} />
+            <DepositReceivedButton
+              appointmentId={request.id}
+              defaultAmount={request.services.deposit_amount}
+            />
           )}
           <RescheduleDialog appointmentId={request.id} currentStartTime={request.start_time} />
           <RejectDialog appointmentId={request.id} />
