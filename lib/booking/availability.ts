@@ -32,6 +32,33 @@ function rangesOverlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) {
 }
 
 /**
+ * Fusiona franjas contiguas o solapadas (ej. 09:00-10:00 + 10:00-11:00) en
+ * una sola ventana continua. Sin esto, un servicio cuya duración+buffer
+ * excede el ancho de una franja individual nunca encuentra horario, aunque
+ * el día tenga tiempo abierto de sobra repartido en varias franjas seguidas.
+ */
+function mergeWindows<T extends { start_time: string; end_time: string }>(
+  windows: T[],
+): { start_time: string; end_time: string }[] {
+  const sorted = [...windows].sort(
+    (a, b) => timeStrToMinutes(a.start_time) - timeStrToMinutes(b.start_time),
+  );
+
+  const merged: { start_time: string; end_time: string }[] = [];
+  for (const w of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && timeStrToMinutes(w.start_time) <= timeStrToMinutes(last.end_time)) {
+      if (timeStrToMinutes(w.end_time) > timeStrToMinutes(last.end_time)) {
+        last.end_time = w.end_time;
+      }
+    } else {
+      merged.push({ start_time: w.start_time, end_time: w.end_time });
+    }
+  }
+  return merged;
+}
+
+/**
  * Calcula los horarios disponibles para un servicio: plantilla semanal
  * menos bloqueos puntuales menos citas activas, en bloques de
  * duration_min + buffer_min, dentro de la ventana [ahora+lead, ahora+horizonte].
@@ -104,7 +131,9 @@ export async function getAvailableSlots(
     const dateStr = formatDateStr(dateWallClock);
     const dayOfWeek = bogotaDayOfWeek(bogotaWallTimeToUtc(dateStr, '00:00'));
 
-    const windows = availability.filter((w) => w.day_of_week === dayOfWeek);
+    const windows = mergeWindows(
+      availability.filter((w) => w.day_of_week === dayOfWeek),
+    );
     if (windows.length === 0) continue;
 
     const daySlots: string[] = [];
