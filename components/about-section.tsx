@@ -70,7 +70,12 @@ export default function AboutSection({
           className='grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 items-center'
         >
           {/* Fotos: principal grande + secundaria superpuesta */}
-          <motion.div variants={item} className='relative aspect-[4/5] max-w-md mx-auto md:mx-0'>
+          {/* w-full es necesario: en CSS Grid, margin:auto en el eje que se
+              centra desactiva el stretch por defecto y el ítem pasa a
+              dimensionarse por su contenido intrínseco — como la imagen usa
+              `fill` (position:absolute), no aporta ancho intrínseco y el
+              contenedor quedaba en 0px de ancho en mobile. */}
+          <motion.div variants={item} className='relative aspect-[4/5] w-full max-w-md mx-auto md:mx-0'>
             <div className='relative w-full h-full rounded-2xl overflow-hidden shadow-2xl'>
               <Image
                 src={founderImageUrl1 || '/placeholder.svg'}
@@ -87,7 +92,7 @@ export default function AboutSection({
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.3, ease: EASE_OUT }}
                 whileHover={shouldReduce ? {} : { scale: 1.03 }}
-                className='absolute -bottom-8 -right-6 w-2/5 aspect-[3/4] rounded-xl overflow-hidden shadow-2xl border-4 border-brand-ink'
+                className='absolute -bottom-8 right-0 sm:-right-6 w-2/5 aspect-[3/4] rounded-xl overflow-hidden shadow-2xl border-4 border-brand-ink'
               >
                 <Image
                   src={founderImageUrl2}

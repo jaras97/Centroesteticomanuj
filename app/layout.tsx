@@ -82,13 +82,19 @@ const playfair = Playfair_Display({
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
-export const metadata: Metadata = {
-  title: 'centro estetico manuj',
-  description: 'Maquilladora y cosmetóloga profesional',
-  icons: {
-    icon: 'https://res.cloudinary.com/dcuethtco/image/upload/v1754769881/isologo_dhkiyh.svg',
-  },
-};
+// generateMetadata (no `export const metadata` estático) porque el favicon
+// ahora sale de site_settings.logo_url — se puede cambiar desde
+// /admin/contenido sin deploy, igual que el logo del header/footer.
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+  return {
+    title: 'centro estetico manuj',
+    description: 'Maquilladora y cosmetóloga profesional',
+    icons: {
+      icon: settings.logo_url || undefined,
+    },
+  };
+}
 
 export default async function RootLayout({
   children,

@@ -15,9 +15,11 @@ const nextConfig = {
     },
   },
   images: {
+    // Cloudinary retirado: todo el contenido (logo incluido) vive en
+    // Supabase Storage desde acá en adelante — ver
+    // docs/HANDOFF-cms-contenido-fase-1.md.
     unoptimized: true,
      remotePatterns: [
-      { protocol: 'https', hostname: 'res.cloudinary.com' },
       { protocol: 'https', hostname: 'rtmuaeonmqadbezygfrv.supabase.co' },
     ],
   },
