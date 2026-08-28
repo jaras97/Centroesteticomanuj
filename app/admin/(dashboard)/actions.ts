@@ -563,32 +563,22 @@ export async function uploadSiteMedia(
 
 type ReorderableTable = 'hero_slides' | 'service_categories' | 'gallery_images';
 
-async function reorderRow(
+// Recibe el orden completo (ids) tal como quedó tras arrastrar en el admin
+// (ver components/admin/*-table.tsx, framer-motion Reorder) y lo persiste
+// de una sola vez — más simple y más barato que ir intercambiando de a
+// pares, y es lo que un gesto de drag-and-drop produce naturalmente.
+async function reorderRows(
   supabase: Awaited<ReturnType<typeof requireUser>>,
   table: ReorderableTable,
-  id: string,
-  direction: 'up' | 'down',
+  orderedIds: string[],
 ) {
-  const { data: rows, error: listError } = await supabase
-    .from(table)
-    .select('id, display_order')
-    .order('display_order');
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase.from(table).update({ display_order: index }).eq('id', id),
+    ),
+  );
 
-  if (listError || !rows) return { ok: false, error: 'No se pudo reordenar.' };
-
-  const index = rows.findIndex((r) => r.id === id);
-  const targetIndex = direction === 'up' ? index - 1 : index + 1;
-  if (index === -1 || targetIndex < 0 || targetIndex >= rows.length) return { ok: true };
-
-  const current = rows[index];
-  const target = rows[targetIndex];
-
-  const [{ error: e1 }, { error: e2 }] = await Promise.all([
-    supabase.from(table).update({ display_order: target.display_order }).eq('id', current.id),
-    supabase.from(table).update({ display_order: current.display_order }).eq('id', target.id),
-  ]);
-
-  if (e1 || e2) return { ok: false, error: 'No se pudo reordenar.' };
+  if (results.some((r) => r.error)) return { ok: false, error: 'No se pudo reordenar.' };
   return { ok: true };
 }
 
@@ -678,9 +668,9 @@ export async function deleteHeroSlide(id: string) {
   return { ok: true };
 }
 
-export async function reorderHeroSlide(id: string, direction: 'up' | 'down') {
+export async function reorderHeroSlides(orderedIds: string[]) {
   const supabase = await requireUser();
-  const result = await reorderRow(supabase, 'hero_slides', id, direction);
+  const result = await reorderRows(supabase, 'hero_slides', orderedIds);
   revalidateContenido();
   return result;
 }
@@ -759,9 +749,9 @@ export async function deleteServiceCategory(id: string) {
   return { ok: true };
 }
 
-export async function reorderServiceCategory(id: string, direction: 'up' | 'down') {
+export async function reorderServiceCategories(orderedIds: string[]) {
   const supabase = await requireUser();
-  const result = await reorderRow(supabase, 'service_categories', id, direction);
+  const result = await reorderRows(supabase, 'service_categories', orderedIds);
   revalidateContenido();
   return result;
 }
@@ -830,9 +820,9 @@ export async function deleteGalleryImage(id: string) {
   return { ok: true };
 }
 
-export async function reorderGalleryImage(id: string, direction: 'up' | 'down') {
+export async function reorderGalleryImages(orderedIds: string[]) {
   const supabase = await requireUser();
-  const result = await reorderRow(supabase, 'gallery_images', id, direction);
+  const result = await reorderRows(supabase, 'gallery_images', orderedIds);
   revalidateContenido();
   return result;
 }

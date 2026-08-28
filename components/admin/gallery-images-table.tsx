@@ -1,29 +1,25 @@
 'use client';
 
-import { useMemo, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import Image from 'next/image';
+import { Reorder, useDragControls } from 'framer-motion';
 import { toast } from 'sonner';
-import { ArrowDown, ArrowUp, ImageIcon, Loader2 } from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { GripVertical, ImageIcon, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/admin/empty-state';
 import GalleryImageFormDialog from '@/components/admin/gallery-image-form-dialog';
 import {
   deleteGalleryImage,
-  reorderGalleryImage,
+  reorderGalleryImages,
   setGalleryImageActive,
 } from '@/app/admin/(dashboard)/actions';
 import type { GalleryImage } from '@/lib/supabase/types';
 
-export default function GalleryImagesTable({ images }: { images: GalleryImage[] }) {
+export default function GalleryImagesTable({ images: imagesProp }: { images: GalleryImage[] }) {
+  const [images, setImages] = useState(imagesProp);
+  useEffect(() => setImages(imagesProp), [imagesProp]);
+
   const existingCategories = useMemo(
     () => Array.from(new Set(images.map((i) => i.category))).sort(),
     [images],
@@ -33,51 +29,37 @@ export default function GalleryImagesTable({ images }: { images: GalleryImage[] 
     return <EmptyState icon={ImageIcon} message='Todavía no hay imágenes en la galería.' />;
   }
 
+  function persistOrder(newOrder: GalleryImage[]) {
+    reorderGalleryImages(newOrder.map((i) => i.id)).then((result) => {
+      if (!result.ok) toast.error(result.error);
+    });
+  }
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Orden</TableHead>
-          <TableHead>Imagen</TableHead>
-          <TableHead>Categoría</TableHead>
-          <TableHead>Estado</TableHead>
-          <TableHead>Acciones</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {images.map((image, index) => (
-          <ImageRow
-            key={image.id}
-            image={image}
-            existingCategories={existingCategories}
-            isFirst={index === 0}
-            isLast={index === images.length - 1}
-          />
-        ))}
-      </TableBody>
-    </Table>
+    <Reorder.Group as='ul' axis='y' values={images} onReorder={setImages} className='space-y-2'>
+      {images.map((image) => (
+        <ImageRow
+          key={image.id}
+          image={image}
+          existingCategories={existingCategories}
+          onDragEnd={() => persistOrder(images)}
+        />
+      ))}
+    </Reorder.Group>
   );
 }
 
 function ImageRow({
   image,
   existingCategories,
-  isFirst,
-  isLast,
+  onDragEnd,
 }: {
   image: GalleryImage;
   existingCategories: string[];
-  isFirst: boolean;
-  isLast: boolean;
+  onDragEnd: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
-
-  function move(direction: 'up' | 'down') {
-    startTransition(async () => {
-      const result = await reorderGalleryImage(image.id, direction);
-      if (!result.ok) toast.error(result.error);
-    });
-  }
+  const dragControls = useDragControls();
 
   function toggleActive() {
     startTransition(async () => {
@@ -94,50 +76,44 @@ function ImageRow({
   }
 
   return (
-    <TableRow>
-      <TableCell>
-        <div className='flex gap-1'>
-          <Button
-            size='sm'
-            variant='outline'
-            disabled={isPending || isFirst}
-            onClick={() => move('up')}
-          >
-            <ArrowUp className='h-3.5 w-3.5' />
-          </Button>
-          <Button
-            size='sm'
-            variant='outline'
-            disabled={isPending || isLast}
-            onClick={() => move('down')}
-          >
-            <ArrowDown className='h-3.5 w-3.5' />
-          </Button>
-        </div>
-      </TableCell>
-      <TableCell>
-        <div className='relative h-14 w-14 rounded overflow-hidden bg-gray-100'>
-          <Image src={image.image_url} alt='' fill className='object-cover' />
-        </div>
-      </TableCell>
-      <TableCell className='font-medium text-brand-ink'>{image.category}</TableCell>
-      <TableCell>
-        <Badge variant={image.active ? 'success' : 'secondary'}>
-          {image.active ? 'Activa' : 'Inactiva'}
-        </Badge>
-      </TableCell>
-      <TableCell>
-        <div className='flex gap-2'>
-          <GalleryImageFormDialog image={image} existingCategories={existingCategories} />
-          <Button size='sm' variant='outline' disabled={isPending} onClick={toggleActive}>
-            {isPending && <Loader2 className='h-3.5 w-3.5 animate-spin' />}
-            {image.active ? 'Desactivar' : 'Activar'}
-          </Button>
-          <Button size='sm' variant='outline' disabled={isPending} onClick={handleDelete}>
-            Eliminar
-          </Button>
-        </div>
-      </TableCell>
-    </TableRow>
+    <Reorder.Item
+      as='li'
+      value={image}
+      dragListener={false}
+      dragControls={dragControls}
+      onDragEnd={onDragEnd}
+      className='flex items-center gap-3 rounded-lg border bg-white p-3 shadow-sm'
+      whileDrag={{ boxShadow: '0 8px 20px rgba(0,0,0,0.12)', scale: 1.01 }}
+    >
+      <button
+        type='button'
+        onPointerDown={(e) => dragControls.start(e)}
+        className='cursor-grab touch-none text-gray-300 hover:text-gray-500 active:cursor-grabbing'
+        aria-label='Arrastrar para reordenar'
+      >
+        <GripVertical className='h-5 w-5' />
+      </button>
+
+      <div className='relative h-14 w-14 shrink-0 rounded overflow-hidden bg-gray-100'>
+        <Image src={image.image_url} alt='' fill className='object-cover' draggable={false} />
+      </div>
+
+      <div className='flex-1 min-w-0 font-medium text-brand-ink truncate'>{image.category}</div>
+
+      <Badge variant={image.active ? 'success' : 'secondary'} className='shrink-0'>
+        {image.active ? 'Activa' : 'Inactiva'}
+      </Badge>
+
+      <div className='flex shrink-0 gap-2'>
+        <GalleryImageFormDialog image={image} existingCategories={existingCategories} />
+        <Button size='sm' variant='outline' disabled={isPending} onClick={toggleActive}>
+          {isPending && <Loader2 className='h-3.5 w-3.5 animate-spin' />}
+          {image.active ? 'Desactivar' : 'Activar'}
+        </Button>
+        <Button size='sm' variant='outline' disabled={isPending} onClick={handleDelete}>
+          Eliminar
+        </Button>
+      </div>
+    </Reorder.Item>
   );
 }
