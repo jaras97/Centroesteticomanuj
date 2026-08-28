@@ -153,13 +153,21 @@ export interface SiteSettings {
   updated_at: string;
 }
 
+/** Filas 'services'/'about'/'mission_vision'/'gallery' son marcadores de
+ * posición sin contenido propio — solo existen para reordenar/activar esas
+ * secciones fijas junto con las editoriales. Ver docs del plan de esta sesión. */
+export type SiteSectionKind = 'editorial' | 'services' | 'about' | 'mission_vision' | 'gallery';
+
 export interface SiteSection {
   id: string;
+  kind: SiteSectionKind;
   title: string;
   body: string;
-  media_type: 'image' | 'video';
+  media_type: 'image' | 'video' | 'color';
   image_url: string | null;
   video_url: string | null;
+  bg_color: string | null;
+  text_color: string;
   text_align: 'left' | 'center' | 'right';
   cta_label: string | null;
   cta_href: string | null;

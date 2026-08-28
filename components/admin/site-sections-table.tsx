@@ -4,7 +4,16 @@ import { useEffect, useState, useTransition } from 'react';
 import Image from 'next/image';
 import { Reorder, useDragControls } from 'framer-motion';
 import { toast } from 'sonner';
-import { GripVertical, Loader2, Rows3, Video } from 'lucide-react';
+import {
+  Compass,
+  GripVertical,
+  ImageIcon,
+  Loader2,
+  Rows3,
+  Sparkles,
+  UserRound,
+  Video,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/admin/empty-state';
@@ -14,7 +23,24 @@ import {
   reorderSiteSections,
   setSiteSectionActive,
 } from '@/app/admin/(dashboard)/actions';
-import type { SiteSection } from '@/lib/supabase/types';
+import type { SiteSection, SiteSectionKind } from '@/lib/supabase/types';
+
+// Filas marcador (sin contenido propio acá — se edita en su propia
+// pestaña) muestran un ícono fijo y no se pueden editar/eliminar desde
+// esta lista, solo reordenar y activar/desactivar.
+const MARKER_ICONS: Record<Exclude<SiteSectionKind, 'editorial'>, typeof Sparkles> = {
+  services: Sparkles,
+  about: UserRound,
+  mission_vision: Compass,
+  gallery: ImageIcon,
+};
+
+const MARKER_HINTS: Record<Exclude<SiteSectionKind, 'editorial'>, string> = {
+  services: 'Contenido en la pestaña "Servicios"',
+  about: 'Contenido en la pestaña "Sitio"',
+  mission_vision: 'Contenido en la pestaña "Sitio"',
+  gallery: 'Contenido en la pestaña "Galería"',
+};
 
 export default function SiteSectionsTable({ sections: sectionsProp }: { sections: SiteSection[] }) {
   const [sections, setSections] = useState(sectionsProp);
@@ -42,6 +68,8 @@ export default function SiteSectionsTable({ sections: sectionsProp }: { sections
 function SectionRow({ section, onDragEnd }: { section: SiteSection; onDragEnd: () => void }) {
   const [isPending, startTransition] = useTransition();
   const dragControls = useDragControls();
+  const markerKind = section.kind !== 'editorial' ? section.kind : null;
+  const isMarker = markerKind !== null;
 
   function toggleActive() {
     startTransition(async () => {
@@ -56,6 +84,8 @@ function SectionRow({ section, onDragEnd }: { section: SiteSection; onDragEnd: (
       if (!result.ok) toast.error(result.error);
     });
   }
+
+  const MarkerIcon = markerKind ? MARKER_ICONS[markerKind] : null;
 
   return (
     <Reorder.Item
@@ -78,20 +108,29 @@ function SectionRow({ section, onDragEnd }: { section: SiteSection; onDragEnd: (
         </button>
 
         <div className='relative h-12 w-20 shrink-0 rounded overflow-hidden bg-gray-100 flex items-center justify-center'>
-          {section.image_url ? (
+          {MarkerIcon ? (
+            <MarkerIcon className='h-5 w-5 text-gray-400' />
+          ) : section.media_type === 'color' ? (
+            <div className='h-full w-full' style={{ backgroundColor: section.bg_color ?? undefined }} />
+          ) : section.image_url ? (
             <Image src={section.image_url} alt='' fill className='object-cover' draggable={false} />
           ) : section.media_type === 'video' ? (
             <Video className='h-5 w-5 text-gray-400' />
           ) : null}
         </div>
 
-        <div className='flex-1 min-w-0 font-medium text-brand-ink truncate'>
-          {section.title}
-          {section.media_type === 'video' && (
-            <Badge variant='secondary' className='ml-2 gap-1 align-middle'>
-              <Video className='h-3 w-3' />
-              Video
-            </Badge>
+        <div className='flex-1 min-w-0'>
+          <div className='font-medium text-brand-ink truncate'>
+            {section.title}
+            {section.media_type === 'video' && (
+              <Badge variant='secondary' className='ml-2 gap-1 align-middle'>
+                <Video className='h-3 w-3' />
+                Video
+              </Badge>
+            )}
+          </div>
+          {isMarker && (
+            <p className='text-xs text-gray-400 truncate'>{markerKind && MARKER_HINTS[markerKind]}</p>
           )}
         </div>
 
@@ -101,14 +140,16 @@ function SectionRow({ section, onDragEnd }: { section: SiteSection; onDragEnd: (
       </div>
 
       <div className='flex flex-wrap shrink-0 gap-2 sm:ml-auto'>
-        <SiteSectionFormDialog section={section} />
+        {!isMarker && <SiteSectionFormDialog section={section} />}
         <Button size='sm' variant='outline' disabled={isPending} onClick={toggleActive}>
           {isPending && <Loader2 className='h-3.5 w-3.5 animate-spin' />}
           {section.active ? 'Desactivar' : 'Activar'}
         </Button>
-        <Button size='sm' variant='outline' disabled={isPending} onClick={handleDelete}>
-          Eliminar
-        </Button>
+        {!isMarker && (
+          <Button size='sm' variant='outline' disabled={isPending} onClick={handleDelete}>
+            Eliminar
+          </Button>
+        )}
       </div>
     </Reorder.Item>
   );

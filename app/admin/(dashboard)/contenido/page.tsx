@@ -108,8 +108,9 @@ export default async function ContenidoPage() {
 
         <TabsContent value='secciones' className='space-y-4'>
           <p className='text-sm text-gray-500'>
-            Bloques de foto de fondo + texto que se muestran seguidos entre "Servicios" y "Sobre
-            nosotros" en la home.
+            El orden de la lista es el orden real en la home — arrastra para reorganizar. Incluye
+            "Servicios", "Sobre nosotros", "Misión y visión" y "Galería" (se editan en sus propias
+            pestañas, acá solo se mueven o se apagan) junto con tus secciones de foto/video/color.
           </p>
           <div className='flex justify-end'>
             <SiteSectionFormDialog />

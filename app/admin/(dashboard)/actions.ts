@@ -1022,9 +1022,11 @@ export async function resetThemeColors() {
 interface SiteSectionInput {
   title: string;
   body: string;
-  mediaType: 'image' | 'video';
+  mediaType: 'image' | 'video' | 'color';
   imageUrl?: string | null;
   videoUrl?: string | null;
+  bgColor?: string | null;
+  textColor: string;
   textAlign: 'left' | 'center' | 'right';
   ctaLabel?: string | null;
   ctaHref?: string | null;
@@ -1035,6 +1037,8 @@ function validateSiteSectionInput(input: SiteSectionInput): string | null {
   if (!input.body.trim()) return 'El texto es obligatorio.';
   if (input.mediaType === 'video') {
     if (!input.videoUrl) return 'Sube el video.';
+  } else if (input.mediaType === 'color') {
+    if (!input.bgColor) return 'Elige un color de fondo.';
   } else if (!input.imageUrl) {
     return 'La imagen es obligatoria.';
   }
@@ -1046,8 +1050,10 @@ function siteSectionDbFields(input: SiteSectionInput) {
     title: input.title.trim(),
     body: input.body.trim(),
     media_type: input.mediaType,
-    image_url: input.imageUrl || null,
+    image_url: input.mediaType !== 'color' ? input.imageUrl || null : null,
     video_url: input.mediaType === 'video' ? input.videoUrl || null : null,
+    bg_color: input.mediaType === 'color' ? input.bgColor || null : null,
+    text_color: input.textColor,
     text_align: input.textAlign,
     cta_label: input.ctaLabel?.trim() || null,
     cta_href: input.ctaHref?.trim() || null,
@@ -1062,9 +1068,11 @@ export async function createSiteSection(input: SiteSectionInput) {
 
   const { count } = await supabase.from('site_sections').select('id', { count: 'exact', head: true });
 
+  // Siempre 'editorial': las filas marcador (servicios/sobre-nosotros/...)
+  // solo se crean por la migración de siembra, nunca desde este formulario.
   const { error } = await supabase
     .from('site_sections')
-    .insert({ ...siteSectionDbFields(input), display_order: count ?? 0 });
+    .insert({ ...siteSectionDbFields(input), kind: 'editorial', display_order: count ?? 0 });
 
   if (error) return { ok: false, error: 'No se pudo crear la sección.' };
 
@@ -1099,6 +1107,20 @@ export async function setSiteSectionActive(id: string, active: boolean) {
 
 export async function deleteSiteSection(id: string) {
   const supabase = await requireUser();
+
+  // Las filas marcador (servicios/sobre-nosotros/misión-visión/galería) no
+  // se pueden borrar — solo desactivar. Si se borraran, esa sección
+  // desaparecería del home sin forma de recuperarla desde el admin.
+  const { data: section } = await supabase
+    .from('site_sections')
+    .select('kind')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (section && section.kind !== 'editorial') {
+    return { ok: false, error: 'Esta sección no se puede eliminar, solo desactivar.' };
+  }
+
   const { error } = await supabase.from('site_sections').delete().eq('id', id);
   if (error) return { ok: false, error: 'No se pudo eliminar la sección.' };
   revalidateContenido();

@@ -36,9 +36,13 @@ export default function SiteSectionFormDialog({
 }) {
   const isEditing = !!section;
   const [open, setOpen] = useState(false);
-  const [mediaType, setMediaType] = useState<'image' | 'video'>(section?.media_type ?? 'image');
+  const [mediaType, setMediaType] = useState<'image' | 'video' | 'color'>(
+    section?.media_type ?? 'image',
+  );
   const [imageUrl, setImageUrl] = useState(section?.image_url ?? '');
   const [videoUrl, setVideoUrl] = useState(section?.video_url ?? '');
+  const [bgColor, setBgColor] = useState(section?.bg_color ?? '#0C0C0C');
+  const [textColor, setTextColor] = useState(section?.text_color ?? '#FFFFFF');
   const [title, setTitle] = useState(section?.title ?? '');
   const [body, setBody] = useState(section?.body ?? '');
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>(
@@ -57,6 +61,10 @@ export default function SiteSectionFormDialog({
       toast.error('Sube una imagen para la sección.');
       return;
     }
+    if (mediaType === 'color' && !bgColor) {
+      toast.error('Elige un color de fondo.');
+      return;
+    }
     if (!title.trim()) {
       toast.error('El título es obligatorio.');
       return;
@@ -70,6 +78,8 @@ export default function SiteSectionFormDialog({
       mediaType,
       imageUrl: imageUrl || null,
       videoUrl: videoUrl || null,
+      bgColor: bgColor || null,
+      textColor,
       title: title.trim(),
       body: body.trim(),
       textAlign,
@@ -109,13 +119,17 @@ export default function SiteSectionFormDialog({
         <div className='space-y-4'>
           <div className='space-y-2'>
             <Label htmlFor='section-media-type'>Tipo</Label>
-            <Select value={mediaType} onValueChange={(v) => setMediaType(v as 'image' | 'video')}>
+            <Select
+              value={mediaType}
+              onValueChange={(v) => setMediaType(v as 'image' | 'video' | 'color')}
+            >
               <SelectTrigger id='section-media-type'>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value='image'>Imagen</SelectItem>
                 <SelectItem value='video'>Video (clip corto)</SelectItem>
+                <SelectItem value='color'>Color sólido (sin foto)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -131,12 +145,34 @@ export default function SiteSectionFormDialog({
                 <ImageUpload folder='services' value={imageUrl} onChange={setImageUrl} />
               </div>
             </>
+          ) : mediaType === 'color' ? (
+            <div className='space-y-2'>
+              <Label htmlFor='section-bg-color'>Color de fondo</Label>
+              <Input
+                id='section-bg-color'
+                type='color'
+                className='h-10 p-1'
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+              />
+            </div>
           ) : (
             <div className='space-y-2'>
               <Label>Imagen de fondo</Label>
               <ImageUpload folder='services' value={imageUrl} onChange={setImageUrl} />
             </div>
           )}
+
+          <div className='space-y-2'>
+            <Label htmlFor='section-text-color'>Color del texto</Label>
+            <Input
+              id='section-text-color'
+              type='color'
+              className='h-10 p-1'
+              value={textColor}
+              onChange={(e) => setTextColor(e.target.value)}
+            />
+          </div>
 
           <div className='space-y-2'>
             <Label htmlFor='section-title'>Título</Label>

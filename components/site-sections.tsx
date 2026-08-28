@@ -29,42 +29,38 @@ const OVERLAY_CLASSES = {
   right: 'bg-gradient-to-l from-black/70 via-black/35 to-transparent',
 } as const;
 
-export default function SiteSections({ sections }: { sections: SiteSection[] }) {
-  if (sections.length === 0) return null;
+export function EditorialSection({ section }: { section: SiteSection }) {
+  const isSolidColor = section.media_type === 'color';
 
   return (
-    <>
-      {sections.map((section) => (
-        <EditorialSection key={section.id} section={section} />
-      ))}
-    </>
-  );
-}
+    <section
+      className='relative h-[70vh] md:h-[85vh] overflow-hidden'
+      style={isSolidColor ? { backgroundColor: section.bg_color ?? undefined } : undefined}
+    >
+      {!isSolidColor &&
+        (section.media_type === 'video' && section.video_url ? (
+          <video
+            src={section.video_url}
+            poster={section.image_url || undefined}
+            autoPlay
+            muted
+            loop
+            playsInline
+            className='absolute inset-0 w-full h-full object-cover'
+          />
+        ) : (
+          <Image
+            src={section.image_url || '/placeholder.svg'}
+            alt=''
+            fill
+            className='object-cover'
+            sizes='100vw'
+          />
+        ))}
 
-function EditorialSection({ section }: { section: SiteSection }) {
-  return (
-    <section className='relative h-[70vh] md:h-[85vh] overflow-hidden'>
-      {section.media_type === 'video' && section.video_url ? (
-        <video
-          src={section.video_url}
-          poster={section.image_url || undefined}
-          autoPlay
-          muted
-          loop
-          playsInline
-          className='absolute inset-0 w-full h-full object-cover'
-        />
-      ) : (
-        <Image
-          src={section.image_url || '/placeholder.svg'}
-          alt=''
-          fill
-          className='object-cover'
-          sizes='100vw'
-        />
-      )}
-
-      <div className={`absolute inset-0 ${OVERLAY_CLASSES[section.text_align]}`} />
+      {/* Un color sólido ya es plano — el overlay de contraste solo hace
+          falta cuando hay foto/video detrás del texto. */}
+      {!isSolidColor && <div className={`absolute inset-0 ${OVERLAY_CLASSES[section.text_align]}`} />}
 
       <div className='relative h-full max-w-7xl mx-auto px-6 sm:px-8 lg:px-12'>
         <motion.div
@@ -76,11 +72,16 @@ function EditorialSection({ section }: { section: SiteSection }) {
         >
           <motion.h2
             variants={item}
-            className='font-display italic font-bold text-4xl md:text-5xl text-white leading-tight'
+            style={{ color: section.text_color }}
+            className='font-display italic font-bold text-4xl md:text-5xl leading-tight'
           >
             {section.title}
           </motion.h2>
-          <motion.p variants={item} className='text-lg text-gray-100/90 leading-relaxed'>
+          <motion.p
+            variants={item}
+            style={{ color: section.text_color, opacity: 0.85 }}
+            className='text-lg leading-relaxed'
+          >
             {section.body}
           </motion.p>
           {section.cta_label && section.cta_href && (
