@@ -74,41 +74,43 @@ function SlideRow({ slide, onDragEnd }: { slide: HeroSlide; onDragEnd: () => voi
       dragListener={false}
       dragControls={dragControls}
       onDragEnd={onDragEnd}
-      className='flex items-center gap-3 rounded-lg border bg-white p-3 shadow-sm'
+      className='flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border bg-white p-3 shadow-sm'
       whileDrag={{ boxShadow: '0 8px 20px rgba(0,0,0,0.12)', scale: 1.01 }}
     >
-      <button
-        type='button'
-        onPointerDown={(e) => dragControls.start(e)}
-        className='cursor-grab touch-none text-gray-300 hover:text-gray-500 active:cursor-grabbing'
-        aria-label='Arrastrar para reordenar'
-      >
-        <GripVertical className='h-5 w-5' />
-      </button>
+      <div className='flex items-center gap-3 min-w-0 w-full sm:w-auto'>
+        <button
+          type='button'
+          onPointerDown={(e) => dragControls.start(e)}
+          className='shrink-0 cursor-grab touch-none text-gray-300 hover:text-gray-500 active:cursor-grabbing'
+          aria-label='Arrastrar para reordenar'
+        >
+          <GripVertical className='h-5 w-5' />
+        </button>
 
-      <div className='relative h-12 w-20 shrink-0 rounded overflow-hidden bg-gray-100 flex items-center justify-center'>
-        {slide.image_url ? (
-          <Image src={slide.image_url} alt='' fill className='object-cover' draggable={false} />
-        ) : slide.media_type === 'video' ? (
-          <Video className='h-5 w-5 text-gray-400' />
-        ) : null}
+        <div className='relative h-12 w-20 shrink-0 rounded overflow-hidden bg-gray-100 flex items-center justify-center'>
+          {slide.image_url ? (
+            <Image src={slide.image_url} alt='' fill className='object-cover' draggable={false} />
+          ) : slide.media_type === 'video' ? (
+            <Video className='h-5 w-5 text-gray-400' />
+          ) : null}
+        </div>
+
+        <div className='flex-1 min-w-0 font-medium text-brand-ink truncate'>
+          {slide.title}
+          {slide.media_type === 'video' && (
+            <Badge variant='secondary' className='ml-2 gap-1 align-middle'>
+              <Video className='h-3 w-3' />
+              Video
+            </Badge>
+          )}
+        </div>
+
+        <Badge variant={slide.active ? 'success' : 'secondary'} className='shrink-0'>
+          {slide.active ? 'Activa' : 'Inactiva'}
+        </Badge>
       </div>
 
-      <div className='flex-1 min-w-0 font-medium text-brand-ink truncate'>
-        {slide.title}
-        {slide.media_type === 'video' && (
-          <Badge variant='secondary' className='ml-2 gap-1 align-middle'>
-            <Video className='h-3 w-3' />
-            Video
-          </Badge>
-        )}
-      </div>
-
-      <Badge variant={slide.active ? 'success' : 'secondary'} className='shrink-0'>
-        {slide.active ? 'Activa' : 'Inactiva'}
-      </Badge>
-
-      <div className='flex shrink-0 gap-2'>
+      <div className='flex flex-wrap shrink-0 gap-2 sm:ml-auto'>
         <HeroSlideFormDialog slide={slide} />
         <Button size='sm' variant='outline' disabled={isPending} onClick={toggleActive}>
           {isPending && <Loader2 className='h-3.5 w-3.5 animate-spin' />}

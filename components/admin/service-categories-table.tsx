@@ -84,29 +84,31 @@ function CategoryRow({
       dragListener={false}
       dragControls={dragControls}
       onDragEnd={onDragEnd}
-      className='flex items-center gap-3 rounded-lg border bg-white p-3 shadow-sm'
+      className='flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border bg-white p-3 shadow-sm'
       whileDrag={{ boxShadow: '0 8px 20px rgba(0,0,0,0.12)', scale: 1.01 }}
     >
-      <button
-        type='button'
-        onPointerDown={(e) => dragControls.start(e)}
-        className='cursor-grab touch-none text-gray-300 hover:text-gray-500 active:cursor-grabbing'
-        aria-label='Arrastrar para reordenar'
-      >
-        <GripVertical className='h-5 w-5' />
-      </button>
+      <div className='flex items-center gap-3 min-w-0 w-full sm:w-auto'>
+        <button
+          type='button'
+          onPointerDown={(e) => dragControls.start(e)}
+          className='shrink-0 cursor-grab touch-none text-gray-300 hover:text-gray-500 active:cursor-grabbing'
+          aria-label='Arrastrar para reordenar'
+        >
+          <GripVertical className='h-5 w-5' />
+        </button>
 
-      <div className='relative h-12 w-16 shrink-0 rounded overflow-hidden bg-gray-100'>
-        <Image src={category.image_url} alt='' fill className='object-cover' draggable={false} />
+        <div className='relative h-12 w-16 shrink-0 rounded overflow-hidden bg-gray-100'>
+          <Image src={category.image_url} alt='' fill className='object-cover' draggable={false} />
+        </div>
+
+        <div className='flex-1 min-w-0 font-medium text-brand-ink truncate'>{category.name}</div>
+
+        <Badge variant={category.active ? 'success' : 'secondary'} className='shrink-0'>
+          {category.active ? 'Activa' : 'Inactiva'}
+        </Badge>
       </div>
 
-      <div className='flex-1 min-w-0 font-medium text-brand-ink truncate'>{category.name}</div>
-
-      <Badge variant={category.active ? 'success' : 'secondary'} className='shrink-0'>
-        {category.active ? 'Activa' : 'Inactiva'}
-      </Badge>
-
-      <div className='flex shrink-0 gap-2'>
+      <div className='flex flex-wrap shrink-0 gap-2 sm:ml-auto'>
         <ServiceCategoryFormDialog category={category} />
         <Button size='sm' variant='outline' disabled={isPending} onClick={toggleActive}>
           {isPending && <Loader2 className='h-3.5 w-3.5 animate-spin' />}

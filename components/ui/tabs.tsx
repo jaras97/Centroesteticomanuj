@@ -13,7 +13,10 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      'inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground',
+      // max-w-full + overflow-x-auto: si los tabs no caben (ej. 5 en un
+      // header móvil de 375px), el propio TabsList scrollea en vez de
+      // empujar el ancho de toda la página.
+      'inline-flex h-10 max-w-full items-center justify-center overflow-x-auto rounded-md bg-muted p-1 text-muted-foreground',
       className,
     )}
     {...props}
