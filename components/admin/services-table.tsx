@@ -17,9 +17,15 @@ import EmptyState from '@/components/admin/empty-state';
 import ServiceFormDialog from '@/components/admin/service-form-dialog';
 import { setServiceActive } from '@/app/admin/(dashboard)/actions';
 import { formatCOP } from '@/lib/format';
-import type { Service } from '@/lib/supabase/types';
+import type { Service, ServiceCategory } from '@/lib/supabase/types';
 
-export default function ServicesTable({ services }: { services: Service[] }) {
+export default function ServicesTable({
+  services,
+  categories,
+}: {
+  services: Service[];
+  categories: ServiceCategory[];
+}) {
   if (services.length === 0) {
     return <EmptyState icon={Tag} message='Todavía no hay servicios registrados.' />;
   }
@@ -29,6 +35,7 @@ export default function ServicesTable({ services }: { services: Service[] }) {
       <TableHeader>
         <TableRow>
           <TableHead>Nombre</TableHead>
+          <TableHead>Categoría</TableHead>
           <TableHead>Duración</TableHead>
           <TableHead>Buffer</TableHead>
           <TableHead>Precio</TableHead>
@@ -39,15 +46,22 @@ export default function ServicesTable({ services }: { services: Service[] }) {
       </TableHeader>
       <TableBody>
         {services.map((service) => (
-          <ServiceRow key={service.id} service={service} />
+          <ServiceRow key={service.id} service={service} categories={categories} />
         ))}
       </TableBody>
     </Table>
   );
 }
 
-function ServiceRow({ service }: { service: Service }) {
+function ServiceRow({
+  service,
+  categories,
+}: {
+  service: Service;
+  categories: ServiceCategory[];
+}) {
   const [isPending, startTransition] = useTransition();
+  const categoryName = categories.find((c) => c.id === service.category_id)?.name;
 
   function toggleActive() {
     startTransition(async () => {
@@ -59,6 +73,7 @@ function ServiceRow({ service }: { service: Service }) {
   return (
     <TableRow>
       <TableCell className='font-medium text-brand-ink'>{service.name}</TableCell>
+      <TableCell className='text-gray-500'>{categoryName ?? '—'}</TableCell>
       <TableCell>{service.duration_min} min</TableCell>
       <TableCell>{service.buffer_min} min</TableCell>
       <TableCell>{service.price != null ? formatCOP(service.price) : '—'}</TableCell>
@@ -72,7 +87,7 @@ function ServiceRow({ service }: { service: Service }) {
       </TableCell>
       <TableCell>
         <div className='flex gap-2'>
-          <ServiceFormDialog service={service} />
+          <ServiceFormDialog service={service} categories={categories} />
           <Button size='sm' variant='outline' disabled={isPending} onClick={toggleActive}>
             {isPending && <Loader2 className='h-3.5 w-3.5 animate-spin' />}
             {service.active ? 'Desactivar' : 'Activar'}

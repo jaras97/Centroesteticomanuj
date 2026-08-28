@@ -6,21 +6,6 @@ import type { Variants } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import AnimatedButton from './ui/AnimatedButton';
 
-const founder = {
-  name: 'Manuela Jaramillo',
-  roles: [
-    'Fundadora',
-    'Maquilladora profesional',
-    'Especialista en maquillaje artístico',
-    'Tratamientos faciales',
-  ],
-  image: [
-    'https://res.cloudinary.com/dcuethtco/image/upload/v1754769847/fundadora_gkqr4q.jpg',
-    'https://res.cloudinary.com/dcuethtco/image/upload/v1754769846/fundadora2_quuwz2.jpg',
-  ],
-  bio: 'Soy cosmetóloga y maquilladora profesional, apasionada por el cuidado de la piel y el arte del maquillaje. Cuento con experiencia y formación en tratamientos faciales, maquillaje social, para novias, quinceañeras, editorial y artístico. Mi compromiso es realzar la belleza natural de cada cliente a través de un servicio personalizado, técnicas actualizadas y una experiencia diseñada para brindar confianza, bienestar y resultados de alta calidad.',
-};
-
 // Easing cubic-bezier (equivalente a easeOut)
 const EASE_OUT: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -48,8 +33,25 @@ const item: Variants = {
   },
 };
 
-export default function AboutSection() {
+interface AboutSectionProps {
+  intro: string;
+  founderName: string;
+  founderBio: string;
+  founderRoles: string[];
+  founderImageUrl1: string | null;
+  founderImageUrl2: string | null;
+}
+
+export default function AboutSection({
+  intro,
+  founderName,
+  founderBio,
+  founderRoles,
+  founderImageUrl1,
+  founderImageUrl2,
+}: AboutSectionProps) {
   const shouldReduce = useReducedMotion();
+  const founderImages = [founderImageUrl1, founderImageUrl2];
 
   return (
     <section id='nosotros' className='py-20 bg-white'>
@@ -72,15 +74,7 @@ export default function AboutSection() {
             variants={item}
             className='text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed'
           >
-            En nuestro centro estético realzamos la belleza única de cada
-            persona a través de técnicas innovadoras de maquillaje y
-            cosmetología, fusionando arte, ciencia y cuidado personalizado.
-            Brindamos experiencias transformadoras que inspiran confianza,
-            elevan la autoestima y promueven el bienestar integral. Nos
-            destacamos por la excelencia profesional, el uso de productos de
-            alta calidad y la pasión creativa que nos impulsa a ser tu primera
-            elección en estética, fomentando una belleza saludable y
-            responsable.
+            {intro}
           </motion.p>
         </motion.div>
 
@@ -105,7 +99,7 @@ export default function AboutSection() {
             <Card className='overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-shadow duration-500'>
               {/* Collage de imágenes (1 en mobile / 2 en desktop) */}
               <div className='grid grid-cols-1 md:grid-cols-2 h-80'>
-                {[founder.image[0], founder.image[1]].map((src, i) => (
+                {founderImages.map((src, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -123,7 +117,7 @@ export default function AboutSection() {
                   >
                     <Image
                       src={src || '/placeholder.svg'}
-                      alt={i === 0 ? founder.name : 'Trabajo de maquillaje'}
+                      alt={i === 0 ? founderName : 'Trabajo de maquillaje'}
                       fill
                       className='object-cover'
                       priority={i === 0}
@@ -148,7 +142,7 @@ export default function AboutSection() {
                     transition={{ duration: 0.8, ease: EASE_OUT }} // antes 0.35
                     className='text-2xl font-bold text-gray-800'
                   >
-                    {founder.name}
+                    {founderName}
                   </motion.h4>
 
                   {/* Roles con stagger más pausado */}
@@ -159,7 +153,7 @@ export default function AboutSection() {
                     variants={stagger}
                     className='flex flex-wrap gap-2'
                   >
-                    {founder.roles.map((r) => (
+                    {founderRoles.map((r) => (
                       <motion.span
                         key={r}
                         variants={item}
@@ -180,7 +174,7 @@ export default function AboutSection() {
                   transition={{ duration: 0.8, ease: EASE_OUT, delay: 0.08 }} // antes 0.35
                   className='text-gray-600 leading-relaxed mb-6'
                 >
-                  {founder.bio}
+                  {founderBio}
                 </motion.p>
 
                 {/* CTAs con microinteracciones más suaves */}

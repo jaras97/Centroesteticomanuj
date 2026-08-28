@@ -19,102 +19,9 @@ const Lightbox = dynamic(() => import('yet-another-react-lightbox'), {
 import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
+import type { GalleryImage } from '@/lib/supabase/types';
 
-const galleryImages = [
-  {
-    id: 1,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1754769847/galeria3_vagqj1.jpg',
-    alt: 'Maquillaje de novia elegante',
-    category: 'Social',
-  },
-  {
-    id: 2,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1754769847/galeria4_qiqko7.jpg',
-    alt: 'Maquillaje artístico colorido',
-    category: 'Artístico',
-  },
-  {
-    id: 3,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1754769846/galeria5_aggvgv.jpg',
-    alt: 'Maquillaje profesional para fotografía',
-    category: 'Profesional',
-  },
-  {
-    id: 4,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1754769846/galeria6_vacudn.jpg',
-    alt: 'Maquillaje glamoroso para fiestas',
-    category: 'Artístico',
-  },
-  {
-    id: 5,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1754769847/galeria7_ae0i6p.jpg',
-    alt: 'Maquillaje vintage estilo retro',
-    category: 'Artístico',
-  },
-  {
-    id: 6,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1754769847/galeria8_h64mbo.jpg',
-    alt: 'Maquillaje editorial para moda',
-    category: 'Artístico',
-  },
-  {
-    id: 7,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1754769846/galeria10_e7brvm.jpg',
-    alt: 'Maquillaje editorial para moda',
-    category: 'Editorial',
-  },
-  {
-    id: 8,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1754769846/galeria12_i7kf0i.jpg',
-    alt: 'Maquillaje social con brillo',
-    category: 'Social',
-  },
-  {
-    id: 9,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1756580828/social1_vndugm.jpg',
-    alt: 'Maquillaje social para evento',
-    category: 'Social',
-  },
-  {
-    id: 10,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888013/editorial3_gxlk5n.jpg',
-    alt: 'Maquillaje social con brillo',
-    category: 'Editorial',
-  },
-  {
-    id: 11,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888012/artistico11_t1mtdu.jpg',
-    alt: 'Maquillaje Artístico',
-    category: 'Artístico',
-  },
-  {
-    id: 12,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888013/artistico10_wryxnq.jpg',
-    alt: 'Maquillaje Artístico',
-    category: 'Artístico',
-  },
-  {
-    id: 13,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888014/social20_wkfluv.jpg',
-    alt: 'Maquillaje social para evento',
-    category: 'Social',
-  },
-  {
-    id: 14,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888013/social10_g51u5k.jpg',
-    alt: 'Maquillaje social para evento',
-    category: 'Social',
-  },
-  {
-    id: 15,
-    src: 'https://res.cloudinary.com/dcuethtco/image/upload/v1785888046/social11_s8n04p.jpg',
-    alt: 'Maquillaje social para evento',
-    category: 'Social',
-  },
-];
-
-const categories = ['Todos', 'Artístico', 'Social', 'Editorial'] as const;
-type Category = (typeof categories)[number];
+const TODOS = 'Todos';
 
 // Easing tipado
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
@@ -135,9 +42,14 @@ const cardItem: Variants = {
   }),
 };
 
-export default function GallerySection() {
-  const [selectedCategory, setSelectedCategory] = useState<Category>('Todos');
+export default function GallerySection({ images }: { images: GalleryImage[] }) {
+  const [selectedCategory, setSelectedCategory] = useState<string>(TODOS);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const categories = useMemo(
+    () => [TODOS, ...Array.from(new Set(images.map((i) => i.category)))],
+    [images],
+  );
 
   // InView del bloque completo (para animar el header)
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -149,22 +61,24 @@ export default function GallerySection() {
 
   const filteredImages = useMemo(
     () =>
-      selectedCategory === 'Todos'
-        ? galleryImages
-        : galleryImages.filter((img) => img.category === selectedCategory),
-    [selectedCategory],
+      selectedCategory === TODOS
+        ? images
+        : images.filter((img) => img.category === selectedCategory),
+    [images, selectedCategory],
   );
 
   const slides = useMemo(
     () =>
       filteredImages.map((img) => ({
-        src: img.src,
-        alt: img.alt,
+        src: img.image_url,
+        alt: img.alt_text,
         title: img.category,
-        description: img.alt,
+        description: img.alt_text,
       })),
     [filteredImages],
   );
+
+  if (images.length === 0) return null;
 
   return (
     <section
@@ -238,17 +152,17 @@ export default function GallerySection() {
                 }}
               >
                 <Image
-                  src={image.src || '/placeholder.svg'}
-                  alt={image.alt}
+                  src={image.image_url || '/placeholder.svg'}
+                  alt={image.alt_text}
                   fill
                   className='object-cover group-hover:scale-110 transition-transform duration-500'
                   sizes='(max-width: 768px) 100vw, (max-width: 1280px) 33vw, 25vw'
-                  priority={image.id === 1}
+                  priority={idx === 0}
                 />
                 <div className='absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300' />
                 <div className='absolute bottom-4 left-4 right-4 text-white transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 opacity-0 group-hover:opacity-100'>
                   <p className='font-semibold text-sm'>{image.category}</p>
-                  <p className='text-xs text-gray-200'>{image.alt}</p>
+                  <p className='text-xs text-gray-200'>{image.alt_text}</p>
                 </div>
               </motion.div>
             ))}

@@ -16,6 +16,7 @@ export interface Service {
   price: number | null;
   deposit_amount: number | null;
   active: boolean;
+  category_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -86,4 +87,81 @@ export interface LoyaltyReward {
   used_at: string | null;
   used_appointment_id: string | null;
   created_at: string;
+}
+
+export interface HeroSlide {
+  id: string;
+  media_type: 'image' | 'video';
+  image_url: string | null;
+  /** Solo si media_type === 'video'. Usa image_url como poster mientras carga. */
+  video_url: string | null;
+  title: string;
+  subtitle: string | null;
+  description: string;
+  cta_label: string;
+  cta_href: string;
+  display_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServiceCategory {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string;
+  features: string[];
+  display_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GalleryImage {
+  id: string;
+  image_url: string;
+  alt_text: string;
+  category: string;
+  display_order: number;
+  active: boolean;
+  created_at: string;
+}
+
+export interface SiteSettings {
+  id: true;
+  logo_url: string | null;
+  phone_display: string | null;
+  whatsapp_number: string | null;
+  email: string | null;
+  address: string | null;
+  instagram_url: string | null;
+  facebook_url: string | null;
+  footer_tagline: string | null;
+  about_intro: string | null;
+  founder_name: string | null;
+  founder_bio: string | null;
+  founder_roles: string[];
+  founder_image_url_1: string | null;
+  founder_image_url_2: string | null;
+  mission_text: string | null;
+  vision_text: string | null;
+  updated_at: string;
+}
+
+export interface Promotion {
+  id: string;
+  title: string;
+  body: string | null;
+  image_url: string | null;
+  cta_label: string | null;
+  cta_href: string | null;
+  requires_birthday: boolean;
+  /** Si es true, la imagen ya incluye el texto de la promo — el modal no muestra título/cuerpo. */
+  image_only: boolean;
+  active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+  updated_at: string;
 }

@@ -5,21 +5,6 @@ import { motion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 
-const pillars = [
-  {
-    id: 1,
-    title: 'Misión',
-    icon: Target,
-    text: 'Crear experiencias de belleza y bienestar que permitan a cada persona redescubrir la mejor versión de sí misma, a través de tratamientos estéticos y maquillaje profesional realizados con conocimiento, dedicación y altos estándares de calidad. Nuestro propósito es que cada cliente no solo vea un cambio en el espejo, sino que también se sienta más segura, cuidada y confiada al salir de nuestro espacio.',
-  },
-  {
-    id: 2,
-    title: 'Visión',
-    icon: Compass,
-    text: 'Ser un centro estético reconocido por transformar la belleza en una experiencia de confianza, innovación y bienestar, destacándonos por la calidad humana, la actualización constante y la excelencia en cada servicio. Aspiramos a convertirnos en un referente en la región, donde cada persona encuentre un lugar que inspire cuidado, autoestima y resultados que superen sus expectativas.',
-  },
-];
-
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
 
 const headerContainer: Variants = {
@@ -36,7 +21,18 @@ const cardItem: Variants = {
   }),
 };
 
-export default function MissionVisionSection() {
+export default function MissionVisionSection({
+  missionText,
+  visionText,
+}: {
+  missionText: string;
+  visionText: string;
+}) {
+  const pillars = [
+    { id: 1, title: 'Misión', icon: Target, text: missionText },
+    { id: 2, title: 'Visión', icon: Compass, text: visionText },
+  ];
+
   return (
     <section id='mision-vision' className='py-20 bg-brand-sand/10'>
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>

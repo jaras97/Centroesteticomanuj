@@ -2,15 +2,11 @@
 
 import { MessageCircle } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { BUSINESS_WHATSAPP_NUMBER, buildWhatsAppLink } from '@/lib/whatsapp';
+import { buildWhatsAppLink } from '@/lib/whatsapp';
 
-const whatsappLink = buildWhatsAppLink(
-  BUSINESS_WHATSAPP_NUMBER,
-  'Hola, quiero más información.',
-);
-
-export default function WhatsAppFloatButton() {
+export default function WhatsAppFloatButton({ whatsappNumber }: { whatsappNumber: string }) {
   const shouldReduce = useReducedMotion();
+  const whatsappLink = buildWhatsAppLink(whatsappNumber, 'Hola, quiero más información.');
 
   return (
     <motion.a

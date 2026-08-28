@@ -15,14 +15,25 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { createService, updateService } from '@/app/admin/(dashboard)/actions';
-import type { Service } from '@/lib/supabase/types';
+import type { Service, ServiceCategory } from '@/lib/supabase/types';
+
+const NO_CATEGORY = '__none__';
 
 export default function ServiceFormDialog({
   service,
+  categories,
   trigger,
 }: {
   service?: Service;
+  categories: ServiceCategory[];
   trigger?: ReactNode;
 }) {
   const isEditing = !!service;
@@ -35,6 +46,7 @@ export default function ServiceFormDialog({
   const [depositAmount, setDepositAmount] = useState(
     service?.deposit_amount != null ? String(service.deposit_amount) : '',
   );
+  const [categoryId, setCategoryId] = useState(service?.category_id ?? NO_CATEGORY);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit() {
@@ -62,6 +74,7 @@ export default function ServiceFormDialog({
       bufferMin: buffer,
       price: price.trim() === '' ? null : Number(price),
       depositAmount: depositAmount.trim() === '' ? null : Number(depositAmount),
+      categoryId: categoryId === NO_CATEGORY ? null : categoryId,
     };
 
     startTransition(async () => {
@@ -156,6 +169,27 @@ export default function ServiceFormDialog({
                 onChange={(e) => setDepositAmount(e.target.value)}
               />
             </div>
+          </div>
+
+          <div className='space-y-2'>
+            <Label htmlFor='service-category'>Categoría (marketing)</Label>
+            <Select value={categoryId} onValueChange={setCategoryId}>
+              <SelectTrigger id='service-category'>
+                <SelectValue placeholder='Sin categoría' />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_CATEGORY}>Sin categoría</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className='text-xs text-gray-500'>
+              Bajo qué card de la sección "Servicios" del sitio aparece agrupado este servicio.
+              Se administra en /admin/contenido.
+            </p>
           </div>
         </div>
 

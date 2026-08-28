@@ -8,49 +8,12 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AnimatedButton from './ui/AnimatedButton';
-
-type Slide = {
-  id: number;
-  image: string;
-  title: string;
-  subtitle?: string;
-  description: string;
-  cta: string;
-};
-
-const slides: Slide[] = [
-  {
-    id: 1,
-    image:
-      'https://res.cloudinary.com/dcuethtco/image/upload/v1785888046/social11_s8n04p.jpg',
-    title: 'Maquillaje Profesional',
-    description:
-      'Servicio de maquillaje profesional para eventos especiales, bodas, grados, cumpleaños, sesiones fotográficas, etc.',
-    cta: 'Reservar Cita',
-  },
-  {
-    id: 2,
-    image:
-      'https://res.cloudinary.com/dcuethtco/image/upload/v1754769880/labios_nilxgu.jpg',
-    title: 'HIDRALIPS',
-    description: 'Regenera, repara y revitaliza tus labios con Hidralips.',
-    cta: 'Reservar Cita',
-  },
-  {
-    id: 3,
-    image:
-      'https://res.cloudinary.com/dcuethtco/image/upload/v1754770398/cosme_v48p1n.jpg',
-    title: 'Tratamientos faciales',
-    description:
-      'Cuidan y mejoran la piel del rostro, limpiando, hidratando y rejuveneciendo su apariencia.',
-    cta: 'Reservar Cita',
-  },
-];
+import type { HeroSlide } from '@/lib/supabase/types';
 
 // easing bezier (equiv. easeOut)
 const EASE_OUT: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-export default function HeroCarousel() {
+export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const shouldReduce = useReducedMotion();
   const autoplay = useRef(
     Autoplay({ delay: 3000, stopOnInteraction: true, stopOnMouseEnter: true }),
@@ -90,6 +53,8 @@ export default function HeroCarousel() {
   const scrollPrev = () => emblaApi?.scrollPrev();
   const scrollNext = () => emblaApi?.scrollNext();
 
+  if (slides.length === 0) return null;
+
   return (
     <section
       id='inicio'
@@ -101,15 +66,27 @@ export default function HeroCarousel() {
         <div className='flex h-full'>
           {slides.map((slide, i) => (
             <div key={slide.id} className='relative min-w-full h-full'>
-              {/* Imagen */}
-              <Image
-                src={slide.image || '/placeholder.svg'}
-                alt={slide.title}
-                fill
-                priority={i === 0}
-                className='object-cover'
-                sizes='100vw'
-              />
+              {/* Imagen o video */}
+              {slide.media_type === 'video' && slide.video_url ? (
+                <video
+                  src={slide.video_url}
+                  poster={slide.image_url || undefined}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className='absolute inset-0 w-full h-full object-cover'
+                />
+              ) : (
+                <Image
+                  src={slide.image_url || '/placeholder.svg'}
+                  alt={slide.title}
+                  fill
+                  priority={i === 0}
+                  className='object-cover'
+                  sizes='100vw'
+                />
+              )}
               {/* Overlay */}
               <div className='absolute inset-0 bg-gradient-to-r from-black/50 to-transparent' />
 
@@ -134,7 +111,7 @@ export default function HeroCarousel() {
                     <p className='text-lg mb-8 text-gray-200 leading-relaxed'>
                       {slide.description}
                     </p>
-                    <AnimatedButton label='Reservar cita' href='/reservar' />
+                    <AnimatedButton label={slide.cta_label} href={slide.cta_href} />
                   </motion.div>
                 </div>
               </div>

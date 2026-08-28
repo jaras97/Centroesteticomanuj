@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { evaluateAndGrantLoyaltyReward, getAvailableRewards as getAvailableRewardsForClient } from '@/lib/booking/loyalty';
+import { bogotaWallTimeToUtc } from '@/lib/booking/timezone';
 
 async function requireUser() {
   const supabase = await createClient();
@@ -453,6 +454,7 @@ interface ServiceInput {
   bufferMin: number;
   price?: number | null;
   depositAmount?: number | null;
+  categoryId?: string | null;
 }
 
 export async function createService(input: ServiceInput) {
@@ -467,6 +469,7 @@ export async function createService(input: ServiceInput) {
     buffer_min: input.bufferMin,
     price: input.price ?? null,
     deposit_amount: input.depositAmount ?? null,
+    category_id: input.categoryId ?? null,
   });
 
   if (error) return { ok: false, error: 'No se pudo crear el servicio.' };
@@ -489,6 +492,7 @@ export async function updateService(id: string, input: ServiceInput) {
       buffer_min: input.bufferMin,
       price: input.price ?? null,
       deposit_amount: input.depositAmount ?? null,
+      category_id: input.categoryId ?? null,
     })
     .eq('id', id);
 
@@ -506,6 +510,485 @@ export async function setServiceActive(id: string, active: boolean) {
   if (error) return { ok: false, error: 'No se pudo actualizar el servicio.' };
 
   revalidateServices();
+  return { ok: true };
+}
+
+// ============================================================
+// Contenido del sitio público (carrusel, categorías de servicios,
+// galería) — ver docs/PRD-cms-contenido-y-promociones.md
+// ============================================================
+
+function revalidateContenido() {
+  revalidatePath('/admin/contenido');
+  revalidatePath('/');
+  // El Footer (y con site_settings, también el logo del header de /reservar)
+  // se renderiza ahí también — ver app/reservar/layout.tsx.
+  revalidatePath('/reservar');
+}
+
+const MAX_VIDEO_BYTES = 15 * 1024 * 1024; // 15MB — clips cortos, no video largo
+
+export async function uploadSiteMedia(
+  folder: 'hero' | 'services' | 'gallery' | 'promos' | 'site',
+  formData: FormData,
+) {
+  const supabase = await requireUser();
+
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false as const, error: 'Selecciona un archivo.' };
+  }
+
+  const isImage = file.type.startsWith('image/');
+  const isVideo = file.type.startsWith('video/');
+  if (!isImage && !isVideo) {
+    return { ok: false as const, error: 'El archivo debe ser una imagen o un video.' };
+  }
+  if (isVideo && file.size > MAX_VIDEO_BYTES) {
+    return { ok: false as const, error: 'El video no puede pesar más de 15MB — usa un clip corto.' };
+  }
+
+  const ext = file.name.split('.').pop()?.toLowerCase() || (isVideo ? 'mp4' : 'jpg');
+  const path = `${folder}/${crypto.randomUUID()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from('site-media')
+    .upload(path, file, { contentType: file.type, upsert: false });
+
+  if (error) return { ok: false as const, error: 'No se pudo subir el archivo.' };
+
+  const { data } = supabase.storage.from('site-media').getPublicUrl(path);
+  return { ok: true as const, url: data.publicUrl };
+}
+
+type ReorderableTable = 'hero_slides' | 'service_categories' | 'gallery_images';
+
+async function reorderRow(
+  supabase: Awaited<ReturnType<typeof requireUser>>,
+  table: ReorderableTable,
+  id: string,
+  direction: 'up' | 'down',
+) {
+  const { data: rows, error: listError } = await supabase
+    .from(table)
+    .select('id, display_order')
+    .order('display_order');
+
+  if (listError || !rows) return { ok: false, error: 'No se pudo reordenar.' };
+
+  const index = rows.findIndex((r) => r.id === id);
+  const targetIndex = direction === 'up' ? index - 1 : index + 1;
+  if (index === -1 || targetIndex < 0 || targetIndex >= rows.length) return { ok: true };
+
+  const current = rows[index];
+  const target = rows[targetIndex];
+
+  const [{ error: e1 }, { error: e2 }] = await Promise.all([
+    supabase.from(table).update({ display_order: target.display_order }).eq('id', current.id),
+    supabase.from(table).update({ display_order: current.display_order }).eq('id', target.id),
+  ]);
+
+  if (e1 || e2) return { ok: false, error: 'No se pudo reordenar.' };
+  return { ok: true };
+}
+
+interface HeroSlideInput {
+  mediaType: 'image' | 'video';
+  imageUrl?: string | null;
+  /** Obligatorio si mediaType es 'video'; imageUrl queda como poster opcional. */
+  videoUrl?: string | null;
+  title: string;
+  subtitle?: string;
+  description: string;
+  ctaLabel: string;
+  ctaHref: string;
+}
+
+function validateHeroSlideInput(input: HeroSlideInput): string | null {
+  if (!input.title.trim()) return 'El título es obligatorio.';
+  if (input.mediaType === 'video') {
+    if (!input.videoUrl) return 'Sube el video.';
+  } else if (!input.imageUrl) {
+    return 'La imagen es obligatoria.';
+  }
+  return null;
+}
+
+function heroSlideDbFields(input: HeroSlideInput) {
+  return {
+    media_type: input.mediaType,
+    image_url: input.imageUrl || null,
+    video_url: input.mediaType === 'video' ? input.videoUrl || null : null,
+    title: input.title.trim(),
+    subtitle: input.subtitle?.trim() || null,
+    description: input.description.trim(),
+    cta_label: input.ctaLabel.trim() || 'Reservar cita',
+    cta_href: input.ctaHref.trim() || '/reservar',
+  };
+}
+
+export async function createHeroSlide(input: HeroSlideInput) {
+  const supabase = await requireUser();
+
+  const validationError = validateHeroSlideInput(input);
+  if (validationError) return { ok: false, error: validationError };
+
+  const { count } = await supabase.from('hero_slides').select('id', { count: 'exact', head: true });
+
+  const { error } = await supabase
+    .from('hero_slides')
+    .insert({ ...heroSlideDbFields(input), display_order: count ?? 0 });
+
+  if (error) return { ok: false, error: 'No se pudo crear la diapositiva.' };
+
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function updateHeroSlide(id: string, input: HeroSlideInput) {
+  const supabase = await requireUser();
+
+  const validationError = validateHeroSlideInput(input);
+  if (validationError) return { ok: false, error: validationError };
+
+  const { error } = await supabase
+    .from('hero_slides')
+    .update(heroSlideDbFields(input))
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar la diapositiva.' };
+
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function setHeroSlideActive(id: string, active: boolean) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('hero_slides').update({ active }).eq('id', id);
+  if (error) return { ok: false, error: 'No se pudo actualizar la diapositiva.' };
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function deleteHeroSlide(id: string) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('hero_slides').delete().eq('id', id);
+  if (error) return { ok: false, error: 'No se pudo eliminar la diapositiva.' };
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function reorderHeroSlide(id: string, direction: 'up' | 'down') {
+  const supabase = await requireUser();
+  const result = await reorderRow(supabase, 'hero_slides', id, direction);
+  revalidateContenido();
+  return result;
+}
+
+interface ServiceCategoryInput {
+  name: string;
+  description: string;
+  imageUrl: string;
+  features: string[];
+}
+
+export async function createServiceCategory(input: ServiceCategoryInput) {
+  const supabase = await requireUser();
+
+  if (!input.name.trim()) return { ok: false, error: 'El nombre es obligatorio.' };
+  if (!input.imageUrl) return { ok: false, error: 'La imagen es obligatoria.' };
+
+  const { count } = await supabase
+    .from('service_categories')
+    .select('id', { count: 'exact', head: true });
+
+  const { error } = await supabase.from('service_categories').insert({
+    name: input.name.trim(),
+    description: input.description.trim(),
+    image_url: input.imageUrl,
+    features: input.features.filter((f) => f.trim()).map((f) => f.trim()),
+    display_order: count ?? 0,
+  });
+
+  if (error) return { ok: false, error: 'No se pudo crear la categoría.' };
+
+  revalidateContenido();
+  revalidateServices();
+  return { ok: true };
+}
+
+export async function updateServiceCategory(id: string, input: ServiceCategoryInput) {
+  const supabase = await requireUser();
+
+  if (!input.name.trim()) return { ok: false, error: 'El nombre es obligatorio.' };
+  if (!input.imageUrl) return { ok: false, error: 'La imagen es obligatoria.' };
+
+  const { error } = await supabase
+    .from('service_categories')
+    .update({
+      name: input.name.trim(),
+      description: input.description.trim(),
+      image_url: input.imageUrl,
+      features: input.features.filter((f) => f.trim()).map((f) => f.trim()),
+    })
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar la categoría.' };
+
+  revalidateContenido();
+  revalidateServices();
+  return { ok: true };
+}
+
+export async function setServiceCategoryActive(id: string, active: boolean) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('service_categories').update({ active }).eq('id', id);
+  if (error) return { ok: false, error: 'No se pudo actualizar la categoría.' };
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function deleteServiceCategory(id: string) {
+  const supabase = await requireUser();
+  // category_id usa "on delete set null": los servicios que la usaban quedan
+  // sin categoría de marketing, pero siguen agendables sin problema.
+  const { error } = await supabase.from('service_categories').delete().eq('id', id);
+  if (error) return { ok: false, error: 'No se pudo eliminar la categoría.' };
+  revalidateContenido();
+  revalidateServices();
+  return { ok: true };
+}
+
+export async function reorderServiceCategory(id: string, direction: 'up' | 'down') {
+  const supabase = await requireUser();
+  const result = await reorderRow(supabase, 'service_categories', id, direction);
+  revalidateContenido();
+  return result;
+}
+
+interface GalleryImageInput {
+  imageUrl: string;
+  altText: string;
+  category: string;
+}
+
+export async function createGalleryImage(input: GalleryImageInput) {
+  const supabase = await requireUser();
+
+  if (!input.imageUrl) return { ok: false, error: 'La imagen es obligatoria.' };
+  if (!input.category.trim()) return { ok: false, error: 'La categoría es obligatoria.' };
+
+  const { count } = await supabase.from('gallery_images').select('id', { count: 'exact', head: true });
+
+  const { error } = await supabase.from('gallery_images').insert({
+    image_url: input.imageUrl,
+    alt_text: input.altText.trim() || input.category.trim(),
+    category: input.category.trim(),
+    display_order: count ?? 0,
+  });
+
+  if (error) return { ok: false, error: 'No se pudo agregar la imagen.' };
+
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function updateGalleryImage(id: string, input: GalleryImageInput) {
+  const supabase = await requireUser();
+
+  if (!input.imageUrl) return { ok: false, error: 'La imagen es obligatoria.' };
+  if (!input.category.trim()) return { ok: false, error: 'La categoría es obligatoria.' };
+
+  const { error } = await supabase
+    .from('gallery_images')
+    .update({
+      image_url: input.imageUrl,
+      alt_text: input.altText.trim() || input.category.trim(),
+      category: input.category.trim(),
+    })
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar la imagen.' };
+
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function setGalleryImageActive(id: string, active: boolean) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('gallery_images').update({ active }).eq('id', id);
+  if (error) return { ok: false, error: 'No se pudo actualizar la imagen.' };
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function deleteGalleryImage(id: string) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('gallery_images').delete().eq('id', id);
+  if (error) return { ok: false, error: 'No se pudo eliminar la imagen.' };
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function reorderGalleryImage(id: string, direction: 'up' | 'down') {
+  const supabase = await requireUser();
+  const result = await reorderRow(supabase, 'gallery_images', id, direction);
+  revalidateContenido();
+  return result;
+}
+
+interface PromotionInput {
+  title: string;
+  body: string;
+  imageUrl?: string | null;
+  ctaLabel?: string | null;
+  ctaHref?: string | null;
+  requiresBirthday: boolean;
+  /** Si es true, la imagen ya trae el texto diseñado — body es opcional. */
+  imageOnly: boolean;
+  /** Fechas simples 'YYYY-MM-DD' (hora de Bogotá), no ISO — se convierten acá. */
+  startsAt?: string | null;
+  endsAt?: string | null;
+}
+
+function validatePromotionInput(input: PromotionInput): string | null {
+  if (!input.title.trim()) return 'El título es obligatorio.';
+  if (input.imageOnly) {
+    if (!input.imageUrl) return 'Sube la imagen — el texto de la promo va incluido en ella.';
+  } else if (!input.body.trim()) {
+    return 'El texto es obligatorio.';
+  }
+  return null;
+}
+
+function promotionDbFields(input: PromotionInput) {
+  return {
+    title: input.title.trim(),
+    body: input.body.trim() || null,
+    image_url: input.imageUrl || null,
+    cta_label: input.ctaLabel?.trim() || null,
+    cta_href: input.ctaHref?.trim() || null,
+    requires_birthday: input.requiresBirthday,
+    image_only: input.imageOnly,
+    // starts_at cuenta desde el inicio del día; ends_at hasta el final del
+    // día, para que una promo que "termina hoy" siga vigente todo hoy.
+    starts_at: input.startsAt ? bogotaWallTimeToUtc(input.startsAt, '00:00').toISOString() : null,
+    ends_at: input.endsAt ? bogotaWallTimeToUtc(input.endsAt, '23:59').toISOString() : null,
+  };
+}
+
+export async function createPromotion(input: PromotionInput) {
+  const supabase = await requireUser();
+
+  const validationError = validatePromotionInput(input);
+  if (validationError) return { ok: false, error: validationError };
+
+  // active queda en false por defecto (ver 0007): crear una promo no la
+  // publica sola, Manu la activa aparte una vez está lista.
+  const { error } = await supabase.from('promotions').insert(promotionDbFields(input));
+
+  if (error) return { ok: false, error: 'No se pudo crear la promoción.' };
+
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function updatePromotion(id: string, input: PromotionInput) {
+  const supabase = await requireUser();
+
+  const validationError = validatePromotionInput(input);
+  if (validationError) return { ok: false, error: validationError };
+
+  const { error } = await supabase
+    .from('promotions')
+    .update(promotionDbFields(input))
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar la promoción.' };
+
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function setPromotionActive(id: string, active: boolean) {
+  const supabase = await requireUser();
+
+  if (active) {
+    // Solo una promo activa a la vez (índice único parcial en 0007) — se
+    // desactivan las demás primero para no chocar contra esa restricción.
+    const { error: deactivateError } = await supabase
+      .from('promotions')
+      .update({ active: false })
+      .neq('id', id)
+      .eq('active', true);
+    if (deactivateError) return { ok: false, error: 'No se pudo activar la promoción.' };
+  }
+
+  const { error } = await supabase.from('promotions').update({ active }).eq('id', id);
+  if (error) return { ok: false, error: 'No se pudo actualizar la promoción.' };
+
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function deletePromotion(id: string) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('promotions').delete().eq('id', id);
+  if (error) return { ok: false, error: 'No se pudo eliminar la promoción.' };
+  revalidateContenido();
+  return { ok: true };
+}
+
+interface SiteSettingsInput {
+  logoUrl?: string | null;
+  phoneDisplay?: string | null;
+  whatsappNumber?: string | null;
+  email?: string | null;
+  address?: string | null;
+  instagramUrl?: string | null;
+  facebookUrl?: string | null;
+  footerTagline?: string | null;
+  aboutIntro?: string | null;
+  founderName?: string | null;
+  founderBio?: string | null;
+  founderRoles: string[];
+  founderImageUrl1?: string | null;
+  founderImageUrl2?: string | null;
+  missionText?: string | null;
+  visionText?: string | null;
+}
+
+// site_settings es una tabla singleton (id boolean, siempre `true` — ver
+// 0009_site_settings.sql), así que "actualizar" es siempre sobre esa
+// única fila. No hay create/delete: la fila la siembra la migración.
+export async function updateSiteSettings(input: SiteSettingsInput) {
+  const supabase = await requireUser();
+
+  const { error } = await supabase
+    .from('site_settings')
+    .update({
+      logo_url: input.logoUrl || null,
+      phone_display: input.phoneDisplay?.trim() || null,
+      whatsapp_number: input.whatsappNumber?.trim() || null,
+      email: input.email?.trim() || null,
+      address: input.address?.trim() || null,
+      instagram_url: input.instagramUrl?.trim() || null,
+      facebook_url: input.facebookUrl?.trim() || null,
+      footer_tagline: input.footerTagline?.trim() || null,
+      about_intro: input.aboutIntro?.trim() || null,
+      founder_name: input.founderName?.trim() || null,
+      founder_bio: input.founderBio?.trim() || null,
+      founder_roles: input.founderRoles.filter((r) => r.trim()).map((r) => r.trim()),
+      founder_image_url_1: input.founderImageUrl1 || null,
+      founder_image_url_2: input.founderImageUrl2 || null,
+      mission_text: input.missionText?.trim() || null,
+      vision_text: input.visionText?.trim() || null,
+    })
+    .eq('id', true);
+
+  if (error) return { ok: false, error: 'No se pudo guardar la configuración.' };
+
+  revalidateContenido();
   return { ok: true };
 }
 

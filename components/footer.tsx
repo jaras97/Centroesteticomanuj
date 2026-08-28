@@ -3,14 +3,31 @@ import Image from 'next/image';
 import { Phone, Mail, MapPin, MessageCircle } from 'lucide-react';
 
 import { DynamicIcon } from 'lucide-react/dynamic';
-import { BUSINESS_WHATSAPP_NUMBER, buildWhatsAppLink } from '@/lib/whatsapp';
+import { buildWhatsAppLink } from '@/lib/whatsapp';
 
-const whatsappLink = buildWhatsAppLink(
-  BUSINESS_WHATSAPP_NUMBER,
-  'Hola, quiero más información.',
-);
+interface FooterProps {
+  logoUrl: string;
+  tagline: string;
+  phoneDisplay: string;
+  whatsappNumber: string;
+  email: string;
+  address: string;
+  instagramUrl: string;
+  facebookUrl: string;
+}
 
-export default function Footer() {
+export default function Footer({
+  logoUrl,
+  tagline,
+  phoneDisplay,
+  whatsappNumber,
+  email,
+  address,
+  instagramUrl,
+  facebookUrl,
+}: FooterProps) {
+  const whatsappLink = buildWhatsAppLink(whatsappNumber, 'Hola, quiero más información.');
+
   return (
     <footer id='contacto' className='bg-brand-ink text-white'>
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16'>
@@ -20,16 +37,14 @@ export default function Footer() {
             <div className='mb-6'>
               <h3 className='text-2xl font-bold mb-4'>
                 <Image
-                  src='https://res.cloudinary.com/dcuethtco/image/upload/v1754769881/isologo_dhkiyh.svg'
+                  src={logoUrl}
                   alt='Logo'
                   width={150}
                   height={50}
                   className='h-10 w-auto'
                 />
               </h3>
-              <p className='text-gray-300 leading-relaxed mb-6'>
-                “Más que un servicio, te brindo una experiencia”
-              </p>
+              <p className='text-gray-300 leading-relaxed mb-6'>{tagline}</p>
             </div>
 
             {/* Contact Info */}
@@ -42,16 +57,16 @@ export default function Footer() {
                   rel='noopener noreferrer'
                   className='hover:text-brand-teal-light transition-colors'
                 >
-                  +57 (321) 548-7690
+                  {phoneDisplay}
                 </a>
               </div>
               <div className='flex items-center space-x-3'>
                 <Mail className='h-5 w-5 text-brand-teal-light' />
-                <span>centroesteticomanuj@gmail.com</span>
+                <span>{email}</span>
               </div>
               <div className='flex items-center space-x-3'>
                 <MapPin className='h-5 w-5 text-brand-teal-light' />
-                <span>Chigorodo, Ant</span>
+                <span>{address}</span>
               </div>
             </div>
           </div>
@@ -101,7 +116,7 @@ export default function Footer() {
           <div className='flex flex-col md:flex-row justify-between items-center'>
             <div className='flex space-x-6 mb-4 md:mb-0'>
               <Link
-                href='https://www.instagram.com/centroestetico_manuj?igsh=cmRoaWd3aXljYjE%3D&utm_source=qr'
+                href={instagramUrl}
                 target='_blank'
                 rel='noopener noreferrer'
                 className='text-brand-teal-light hover:text-white'
@@ -109,7 +124,7 @@ export default function Footer() {
                 <DynamicIcon name='instagram' size={24} />
               </Link>
               <Link
-                href='https://www.facebook.com/share/16NsUkTiZN/?mibextid=wwXIfr'
+                href={facebookUrl}
                 target='_blank'
                 rel='noopener noreferrer'
                 className='text-brand-teal-light hover:text-white'
@@ -127,7 +142,7 @@ export default function Footer() {
               </a>
             </div>
             <div className='text-gray-400 text-sm'>
-              © 2025 Centro Estetico ManuJ. Todos los derechos reservados.
+              © {new Date().getFullYear()} Centro Estetico ManuJ. Todos los derechos reservados.
             </div>
           </div>
         </div>

@@ -66,7 +66,14 @@ const mobileItem = {
   }),
 };
 
-export default function Header() {
+interface HeaderProps {
+  logoUrl: string;
+  phoneDisplay: string;
+  instagramUrl: string;
+  facebookUrl: string;
+}
+
+export default function Header({ logoUrl, phoneDisplay, instagramUrl, facebookUrl }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navigation = [
@@ -126,7 +133,7 @@ export default function Header() {
               className='text-2xl font-bold text-brand-ink'
             >
               <Image
-                src='https://res.cloudinary.com/dcuethtco/image/upload/v1754769881/isologo_dhkiyh.svg'
+                src={logoUrl}
                 alt='Logo'
                 width={150}
                 height={50}
@@ -165,11 +172,11 @@ export default function Header() {
           >
             <div className='flex items-center space-x-2 text-gray-600'>
               <Phone className='h-4 w-4' />
-              <span className='text-sm'>+57 (321) 548-7690</span>
+              <span className='text-sm'>{phoneDisplay}</span>
             </div>
             <div className='flex space-x-2'>
               <Link
-                href='https://www.instagram.com/centroestetico_manuj?igsh=cmRoaWd3aXljYjE%3D&utm_source=qr'
+                href={instagramUrl}
                 target='_blank'
                 rel='noopener noreferrer'
                 className='text-brand-teal hover:text-brand-teal-dark'
@@ -177,7 +184,7 @@ export default function Header() {
                 <DynamicIcon name='instagram' size={24} />
               </Link>
               <Link
-                href='https://www.facebook.com/share/16NsUkTiZN/?mibextid=wwXIfr'
+                href={facebookUrl}
                 target='_blank'
                 rel='noopener noreferrer'
                 className='text-brand-teal hover:text-brand-teal-dark'
@@ -233,7 +240,7 @@ export default function Header() {
                     className='flex items-center space-x-2 text-gray-600'
                   >
                     <Phone className='h-4 w-4' />
-                    <span className='text-sm'>+57 (321) 548-7690</span>
+                    <span className='text-sm'>{phoneDisplay}</span>
                   </motion.div>
                   <motion.div
                     variants={mobileItem}
@@ -241,7 +248,7 @@ export default function Header() {
                     className='flex items-center gap-4'
                   >
                     <Link
-                      href='https://www.instagram.com/centroestetico_manuj?igsh=cmRoaWd3aXljYjE%3D&utm_source=qr'
+                      href={instagramUrl}
                       target='_blank'
                       rel='noopener noreferrer'
                       aria-label='Instagram'
@@ -250,7 +257,7 @@ export default function Header() {
                       <DynamicIcon name='instagram' size={22} />
                     </Link>
                     <Link
-                      href='https://www.facebook.com/share/16NsUkTiZN/?mibextid=wwXIfr'
+                      href={facebookUrl}
                       target='_blank'
                       rel='noopener noreferrer'
                       aria-label='Facebook'

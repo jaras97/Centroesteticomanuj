@@ -2,7 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { CalendarDays, CalendarPlus, Clock, Inbox, LogOut, Tag, Users, Wallet } from 'lucide-react';
+import {
+  CalendarDays,
+  CalendarPlus,
+  Clock,
+  Image as ImageIcon,
+  Inbox,
+  LogOut,
+  Tag,
+  Users,
+  Wallet,
+} from 'lucide-react';
 import { signOut } from '@/app/admin/(dashboard)/actions';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -15,6 +25,7 @@ const LINKS = [
   { href: '/admin/servicios', label: 'Servicios', icon: Tag },
   { href: '/admin/finanzas', label: 'Finanzas', icon: Wallet },
   { href: '/admin/clientes', label: 'Clientes', icon: Users },
+  { href: '/admin/contenido', label: 'Contenido', icon: ImageIcon },
 ];
 
 export default function AdminNav({ email }: { email: string }) {

@@ -6,10 +6,19 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Default de Next es 1MB — insuficiente para subir clips de video cortos
+  // del carrusel vía Server Action (uploadSiteMedia). Las imágenes (mucho
+  // más livianas) siguen funcionando igual, este límite solo sube el techo.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '20mb',
+    },
+  },
   images: {
     unoptimized: true,
      remotePatterns: [
       { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'https', hostname: 'rtmuaeonmqadbezygfrv.supabase.co' },
     ],
   },
    webpack: (config, { isServer }) => {

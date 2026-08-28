@@ -6,11 +6,10 @@ import ServiceFormDialog from '@/components/admin/service-form-dialog';
 export default async function ServiciosPage() {
   const supabase = await createClient();
 
-  const { data: services } = await supabase
-    .from('services')
-    .select('*')
-    .order('active', { ascending: false })
-    .order('name');
+  const [{ data: services }, { data: categories }] = await Promise.all([
+    supabase.from('services').select('*').order('active', { ascending: false }).order('name'),
+    supabase.from('service_categories').select('*').order('display_order'),
+  ]);
 
   return (
     <div>
@@ -19,9 +18,9 @@ export default async function ServiciosPage() {
           <Tag className='h-6 w-6 text-brand-teal' />
           Servicios
         </h1>
-        <ServiceFormDialog />
+        <ServiceFormDialog categories={categories ?? []} />
       </div>
-      <ServicesTable services={services ?? []} />
+      <ServicesTable services={services ?? []} categories={categories ?? []} />
     </div>
   );
 }
