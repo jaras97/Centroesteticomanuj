@@ -146,6 +146,26 @@ export interface SiteSettings {
   founder_image_url_2: string | null;
   mission_text: string | null;
   vision_text: string | null;
+  /** Colores de marca opcionales (hex). null = usar default de globals.css. */
+  theme_ink: string | null;
+  theme_sand: string | null;
+  theme_teal: string | null;
+  updated_at: string;
+}
+
+export interface SiteSection {
+  id: string;
+  title: string;
+  body: string;
+  media_type: 'image' | 'video';
+  image_url: string | null;
+  video_url: string | null;
+  text_align: 'left' | 'center' | 'right';
+  cta_label: string | null;
+  cta_href: string | null;
+  display_order: number;
+  active: boolean;
+  created_at: string;
   updated_at: string;
 }
 

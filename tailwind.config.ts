@@ -57,15 +57,19 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Colores de marca
+        // Colores de marca — hsl(var(...)) en vez de hex fijo para que
+        // /admin/contenido (pestaña Sitio) pueda re-themear en runtime sin
+        // rebuild. Defaults en app/globals.css :root; override inyectado
+        // como <style> inline en app/layout.tsx cuando site_settings trae
+        // theme_ink/theme_sand/theme_teal. Ver lib/theme/colors.ts.
         brand: {
-          ink: "#0C0C0C",
-          sand: "#D2B8A1",
-          "sand-light": "#E6D8C9",
-          "sand-dark": "#B79A80",
-          teal: "#739DAA",
-          "teal-light": "#8FB1BC",
-          "teal-dark": "#5C818C",
+          ink: "hsl(var(--brand-ink))",
+          sand: "hsl(var(--brand-sand))",
+          "sand-light": "hsl(var(--brand-sand-light))",
+          "sand-dark": "hsl(var(--brand-sand-dark))",
+          teal: "hsl(var(--brand-teal))",
+          "teal-light": "hsl(var(--brand-teal-light))",
+          "teal-dark": "hsl(var(--brand-teal-dark))",
           white: "#FFFFFF",
         },
       },

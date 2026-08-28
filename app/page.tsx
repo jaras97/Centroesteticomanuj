@@ -1,9 +1,10 @@
 import Header from "@/components/header"
 import HeroCarousel from "@/components/hero-carousel"
 import ServicesSection from "@/components/services-section"
-import GallerySection from "@/components/gallery-section"
+import SiteSections from "@/components/site-sections"
 import AboutSection from "@/components/about-section"
 import MissionVisionSection from "@/components/mission-vision-section"
+import GalleryPreviewSection from "@/components/gallery-preview-section"
 import Footer from "@/components/footer"
 import WhatsAppFloatButton from "@/components/whatsapp-float-button"
 import PromoModal from "@/components/promo-modal"
@@ -21,12 +22,14 @@ export default async function HomePage() {
   const [
     { data: heroSlides },
     { data: serviceCategories },
+    { data: siteSections },
     { data: galleryImages },
     { data: promotion },
     settings,
   ] = await Promise.all([
     supabase.from('hero_slides').select('*').order('display_order'),
     supabase.from('service_categories').select('*').order('display_order'),
+    supabase.from('site_sections').select('*').order('display_order'),
     supabase.from('gallery_images').select('*').order('display_order'),
     // RLS ya filtra a la promo activa y vigente en su ventana de fechas;
     // el índice único parcial garantiza que hay 0 o 1 fila visible.
@@ -45,7 +48,7 @@ export default async function HomePage() {
       <main>
         <HeroCarousel slides={heroSlides ?? []} />
         <ServicesSection categories={serviceCategories ?? []} />
-        <GallerySection images={galleryImages ?? []} />
+        <SiteSections sections={siteSections ?? []} />
         <AboutSection
           intro={settings.about_intro ?? ''}
           founderName={settings.founder_name ?? ''}
@@ -58,6 +61,7 @@ export default async function HomePage() {
           missionText={settings.mission_text ?? ''}
           visionText={settings.vision_text ?? ''}
         />
+        <GalleryPreviewSection images={galleryImages ?? []} />
       </main>
       <Footer
         logoUrl={settings.logo_url || '/placeholder.svg'}

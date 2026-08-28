@@ -41,6 +41,17 @@ html {
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+    /* Colores de marca por defecto (equivalentes exactos a los hex que
+       usaba tailwind.config.ts antes del theming). Se pueden sobreescribir
+       en runtime desde /admin/contenido -> Sitio -> Colores de marca; ver
+       lib/theme/colors.ts y el <style> inyectado en app/layout.tsx. */
+    --brand-ink: 0 0% 5%;
+    --brand-sand: 28 35% 73%;
+    --brand-sand-light: 31 37% 85%;
+    --brand-sand-dark: 28 28% 61%;
+    --brand-teal: 194 24% 56%;
+    --brand-teal-light: 195 25% 65%;
+    --brand-teal-dark: 194 21% 45%;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;

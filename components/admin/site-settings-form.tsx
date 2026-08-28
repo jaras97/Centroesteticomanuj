@@ -9,8 +9,101 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import ImageUpload from '@/components/admin/image-upload';
-import { updateSiteSettings } from '@/app/admin/(dashboard)/actions';
+import { resetThemeColors, updateSiteSettings, updateThemeColors } from '@/app/admin/(dashboard)/actions';
 import type { SiteSettings } from '@/lib/supabase/types';
+
+// Mismos valores que definía tailwind.config.ts antes del theming — el
+// <input type="color"> nativo necesita un hex válido, nunca vacío.
+const DEFAULT_INK = '#0C0C0C';
+const DEFAULT_SAND = '#D2B8A1';
+const DEFAULT_TEAL = '#739DAA';
+
+function ThemeColorsCard({ settings }: { settings: SiteSettings }) {
+  const [ink, setInk] = useState(settings.theme_ink ?? DEFAULT_INK);
+  const [sand, setSand] = useState(settings.theme_sand ?? DEFAULT_SAND);
+  const [teal, setTeal] = useState(settings.theme_teal ?? DEFAULT_TEAL);
+  const [isPending, startTransition] = useTransition();
+
+  function handleSave() {
+    startTransition(async () => {
+      const result = await updateThemeColors({ ink, sand, teal });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success('Colores guardados.');
+    });
+  }
+
+  function handleReset() {
+    startTransition(async () => {
+      const result = await resetThemeColors();
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setInk(DEFAULT_INK);
+      setSand(DEFAULT_SAND);
+      setTeal(DEFAULT_TEAL);
+      toast.success('Colores por defecto restaurados.');
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className='text-lg'>Colores de marca</CardTitle>
+      </CardHeader>
+      <CardContent className='space-y-4'>
+        <p className='text-sm text-gray-500'>
+          Los tonos claro/oscuro de cada color se calculan solos a partir de estos 3. Se aplican en
+          todo el sitio, incluida esta parte administrativa.
+        </p>
+        <div className='grid grid-cols-3 gap-3'>
+          <div className='space-y-2'>
+            <Label htmlFor='theme-ink'>Principal (textos, fondos oscuros)</Label>
+            <Input
+              id='theme-ink'
+              type='color'
+              className='h-10 p-1'
+              value={ink}
+              onChange={(e) => setInk(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='theme-sand'>Cálido (acentos suaves)</Label>
+            <Input
+              id='theme-sand'
+              type='color'
+              className='h-10 p-1'
+              value={sand}
+              onChange={(e) => setSand(e.target.value)}
+            />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='theme-teal'>Acento (botones, íconos)</Label>
+            <Input
+              id='theme-teal'
+              type='color'
+              className='h-10 p-1'
+              value={teal}
+              onChange={(e) => setTeal(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className='flex justify-end gap-2'>
+          <Button variant='outline' onClick={handleReset} disabled={isPending}>
+            Restaurar colores por defecto
+          </Button>
+          <Button onClick={handleSave} disabled={isPending}>
+            {isPending && <Loader2 className='h-4 w-4 animate-spin' />}
+            Guardar colores
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function SiteSettingsForm({ settings }: { settings: SiteSettings }) {
   const [logoUrl, setLogoUrl] = useState(settings.logo_url ?? '');
@@ -65,6 +158,8 @@ export default function SiteSettingsForm({ settings }: { settings: SiteSettings 
 
   return (
     <div className='space-y-6'>
+      <ThemeColorsCard settings={settings} />
+
       <Card>
         <CardHeader>
           <CardTitle className='text-lg'>Marca y contacto</CardTitle>

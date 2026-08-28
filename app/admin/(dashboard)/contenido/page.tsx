@@ -1,4 +1,4 @@
-import { Building2, GalleryHorizontal, ImageIcon, Megaphone, Sparkles } from 'lucide-react';
+import { Building2, GalleryHorizontal, ImageIcon, Megaphone, Rows3, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import HeroSlidesTable from '@/components/admin/hero-slides-table';
@@ -9,6 +9,8 @@ import GalleryImagesTable from '@/components/admin/gallery-images-table';
 import GalleryImageFormDialog from '@/components/admin/gallery-image-form-dialog';
 import PromotionsTable from '@/components/admin/promotions-table';
 import PromotionFormDialog from '@/components/admin/promotion-form-dialog';
+import SiteSectionsTable from '@/components/admin/site-sections-table';
+import SiteSectionFormDialog from '@/components/admin/site-section-form-dialog';
 import SiteSettingsForm from '@/components/admin/site-settings-form';
 
 export default async function ContenidoPage() {
@@ -19,12 +21,14 @@ export default async function ContenidoPage() {
     { data: categories },
     { data: galleryImages },
     { data: promotions },
+    { data: sections },
     { data: settings },
   ] = await Promise.all([
     supabase.from('hero_slides').select('*').order('display_order'),
     supabase.from('service_categories').select('*').order('display_order'),
     supabase.from('gallery_images').select('*').order('display_order'),
     supabase.from('promotions').select('*').order('created_at', { ascending: false }),
+    supabase.from('site_sections').select('*').order('display_order'),
     supabase.from('site_settings').select('*').eq('id', true).single(),
   ]);
 
@@ -53,6 +57,10 @@ export default async function ContenidoPage() {
           <TabsTrigger value='promociones' className='gap-1.5'>
             <Megaphone className='h-4 w-4' />
             Promociones
+          </TabsTrigger>
+          <TabsTrigger value='secciones' className='gap-1.5'>
+            <Rows3 className='h-4 w-4' />
+            Secciones
           </TabsTrigger>
           <TabsTrigger value='sitio' className='gap-1.5'>
             <Building2 className='h-4 w-4' />
@@ -96,6 +104,17 @@ export default async function ContenidoPage() {
             <PromotionFormDialog />
           </div>
           <PromotionsTable promotions={promotions ?? []} />
+        </TabsContent>
+
+        <TabsContent value='secciones' className='space-y-4'>
+          <p className='text-sm text-gray-500'>
+            Bloques de foto de fondo + texto que se muestran seguidos entre "Servicios" y "Sobre
+            nosotros" en la home.
+          </p>
+          <div className='flex justify-end'>
+            <SiteSectionFormDialog />
+          </div>
+          <SiteSectionsTable sections={sections ?? []} />
         </TabsContent>
 
         <TabsContent value='sitio' className='space-y-4'>

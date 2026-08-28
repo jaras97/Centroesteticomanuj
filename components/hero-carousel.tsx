@@ -5,18 +5,35 @@ import Image from 'next/image';
 import useEmblaCarousel from 'embla-carousel-react';
 import Autoplay from 'embla-carousel-autoplay';
 import { motion, useReducedMotion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import AnimatedButton from './ui/AnimatedButton';
 import type { HeroSlide } from '@/lib/supabase/types';
 
 // easing bezier (equiv. easeOut)
 const EASE_OUT: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
+// El texto entra en cascada (título -> subtítulo -> descripción -> botón),
+// alternando la dirección de entrada por índice de diapositiva (abajo en
+// las pares, desde el costado en las impares) para que no se sienta
+// siempre igual. Se re-dispara cada vez que la diapositiva vuelve a estar
+// activa (animate='show'/'hidden' atado a isActive, no solo al montar).
+const textContainer: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.12, delayChildren: 0.15 } },
+};
+
+function textItemVariants(direction: 'up' | 'side'): Variants {
+  return {
+    hidden: direction === 'up' ? { opacity: 0, y: 32 } : { opacity: 0, x: -32 },
+    show: { opacity: 1, y: 0, x: 0, transition: { duration: 0.7, ease: EASE_OUT } },
+  };
+}
+
 export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const shouldReduce = useReducedMotion();
   const autoplay = useRef(
-    Autoplay({ delay: 3000, stopOnInteraction: true, stopOnMouseEnter: true }),
+    Autoplay({ delay: 4500, stopOnInteraction: true, stopOnMouseEnter: true }),
   );
 
   // Desactiva autoplay si el usuario prefiere menos animación
@@ -64,59 +81,85 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       <div ref={emblaRef} className='h-full'>
         {/* Container */}
         <div className='flex h-full'>
-          {slides.map((slide, i) => (
-            <div key={slide.id} className='relative min-w-full h-full'>
-              {/* Imagen o video */}
-              {slide.media_type === 'video' && slide.video_url ? (
-                <video
-                  src={slide.video_url}
-                  poster={slide.image_url || undefined}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  className='absolute inset-0 w-full h-full object-cover'
-                />
-              ) : (
-                <Image
-                  src={slide.image_url || '/placeholder.svg'}
-                  alt={slide.title}
-                  fill
-                  priority={i === 0}
-                  className='object-cover'
-                  sizes='100vw'
-                />
-              )}
-              {/* Overlay */}
-              <div className='absolute inset-0 bg-gradient-to-r from-black/50 to-transparent' />
+          {slides.map((slide, i) => {
+            const isActive = i === selectedIndex;
+            // Ken Burns alternado: pares hacen zoom in, impares zoom out —
+            // así dos diapositivas seguidas nunca se sienten idénticas.
+            const zoomFrom = i % 2 === 0 ? 1 : 1.08;
+            const zoomTo = i % 2 === 0 ? 1.08 : 1;
+            const textDirection = i % 2 === 0 ? 'up' : 'side';
 
-              {/* Texto animado */}
-              <div className='absolute inset-0 flex items-center'>
-                <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full'>
-                  <motion.div
-                    key={slide.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, ease: EASE_OUT }}
-                    className='max-w-2xl text-white sm:pl-12 lg:pl-6'
-                  >
-                    <h1 className='text-4xl md:text-6xl font-bold mb-4 leading-tight'>
-                      {slide.title}
-                    </h1>
-                    {slide.subtitle ? (
-                      <p className='text-xl md:text-2xl mb-4 text-brand-sand'>
-                        {slide.subtitle}
-                      </p>
-                    ) : null}
-                    <p className='text-lg mb-8 text-gray-200 leading-relaxed'>
-                      {slide.description}
-                    </p>
-                    <AnimatedButton label={slide.cta_label} href={slide.cta_href} />
-                  </motion.div>
+            return (
+              <div key={slide.id} className='relative min-w-full h-full overflow-hidden'>
+                {/* Imagen o video, con zoom continuo mientras está activa */}
+                <motion.div
+                  className='absolute inset-0'
+                  initial={{ scale: zoomFrom }}
+                  animate={{ scale: shouldReduce ? zoomFrom : isActive ? zoomTo : zoomFrom }}
+                  transition={{ duration: 6, ease: 'linear' }}
+                >
+                  {slide.media_type === 'video' && slide.video_url ? (
+                    <video
+                      src={slide.video_url}
+                      poster={slide.image_url || undefined}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      className='absolute inset-0 w-full h-full object-cover'
+                    />
+                  ) : (
+                    <Image
+                      src={slide.image_url || '/placeholder.svg'}
+                      alt={slide.title}
+                      fill
+                      priority={i === 0}
+                      className='object-cover'
+                      sizes='100vw'
+                    />
+                  )}
+                </motion.div>
+                {/* Overlay */}
+                <div className='absolute inset-0 bg-gradient-to-r from-black/50 to-transparent' />
+
+                {/* Texto animado */}
+                <div className='absolute inset-0 flex items-center'>
+                  <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full'>
+                    <motion.div
+                      initial='hidden'
+                      animate={isActive ? 'show' : 'hidden'}
+                      variants={textContainer}
+                      className='max-w-2xl text-white sm:pl-12 lg:pl-6'
+                    >
+                      <motion.h1
+                        variants={textItemVariants(textDirection)}
+                        className='font-display italic font-bold text-4xl md:text-6xl mb-4 leading-tight'
+                      >
+                        {slide.title}
+                      </motion.h1>
+                      {slide.subtitle ? (
+                        <motion.p
+                          variants={textItemVariants(textDirection)}
+                          className='text-xl md:text-2xl mb-4 text-brand-sand'
+                        >
+                          {slide.subtitle}
+                        </motion.p>
+                      ) : null}
+                      <motion.p
+                        variants={textItemVariants(textDirection)}
+                        className='text-lg mb-8 text-gray-200 leading-relaxed'
+                      >
+                        {slide.description}
+                      </motion.p>
+                      <motion.div variants={textItemVariants(textDirection)}>
+                        <AnimatedButton label={slide.cta_label} href={slide.cta_href} />
+                      </motion.div>
+                    </motion.div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

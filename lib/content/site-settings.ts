@@ -24,6 +24,9 @@ const FALLBACK_SETTINGS: SiteSettings = {
   founder_image_url_2: null,
   mission_text: '',
   vision_text: '',
+  theme_ink: null,
+  theme_sand: null,
+  theme_teal: null,
   updated_at: new Date(0).toISOString(),
 };
 

@@ -561,7 +561,11 @@ export async function uploadSiteMedia(
   return { ok: true as const, url: data.publicUrl };
 }
 
-type ReorderableTable = 'hero_slides' | 'service_categories' | 'gallery_images';
+type ReorderableTable =
+  | 'hero_slides'
+  | 'service_categories'
+  | 'gallery_images'
+  | 'site_sections';
 
 // Recibe el orden completo (ids) tal como quedó tras arrastrar en el admin
 // (ver components/admin/*-table.tsx, framer-motion Reorder) y lo persiste
@@ -980,6 +984,132 @@ export async function updateSiteSettings(input: SiteSettingsInput) {
 
   revalidateContenido();
   return { ok: true };
+}
+
+export async function updateThemeColors(input: { ink: string; sand: string; teal: string }) {
+  const supabase = await requireUser();
+
+  const { error } = await supabase
+    .from('site_settings')
+    .update({ theme_ink: input.ink, theme_sand: input.sand, theme_teal: input.teal })
+    .eq('id', true);
+
+  if (error) return { ok: false, error: 'No se pudo guardar los colores.' };
+
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function resetThemeColors() {
+  const supabase = await requireUser();
+
+  const { error } = await supabase
+    .from('site_settings')
+    .update({ theme_ink: null, theme_sand: null, theme_teal: null })
+    .eq('id', true);
+
+  if (error) return { ok: false, error: 'No se pudo restaurar los colores.' };
+
+  revalidateContenido();
+  return { ok: true };
+}
+
+// ============================================================
+// site_sections — bloques "foto de fondo + texto" del home. Mismo molde
+// exacto que hero_slides (createHeroSlide/updateHeroSlide más arriba).
+// ============================================================
+
+interface SiteSectionInput {
+  title: string;
+  body: string;
+  mediaType: 'image' | 'video';
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+  textAlign: 'left' | 'center' | 'right';
+  ctaLabel?: string | null;
+  ctaHref?: string | null;
+}
+
+function validateSiteSectionInput(input: SiteSectionInput): string | null {
+  if (!input.title.trim()) return 'El título es obligatorio.';
+  if (!input.body.trim()) return 'El texto es obligatorio.';
+  if (input.mediaType === 'video') {
+    if (!input.videoUrl) return 'Sube el video.';
+  } else if (!input.imageUrl) {
+    return 'La imagen es obligatoria.';
+  }
+  return null;
+}
+
+function siteSectionDbFields(input: SiteSectionInput) {
+  return {
+    title: input.title.trim(),
+    body: input.body.trim(),
+    media_type: input.mediaType,
+    image_url: input.imageUrl || null,
+    video_url: input.mediaType === 'video' ? input.videoUrl || null : null,
+    text_align: input.textAlign,
+    cta_label: input.ctaLabel?.trim() || null,
+    cta_href: input.ctaHref?.trim() || null,
+  };
+}
+
+export async function createSiteSection(input: SiteSectionInput) {
+  const supabase = await requireUser();
+
+  const validationError = validateSiteSectionInput(input);
+  if (validationError) return { ok: false, error: validationError };
+
+  const { count } = await supabase.from('site_sections').select('id', { count: 'exact', head: true });
+
+  const { error } = await supabase
+    .from('site_sections')
+    .insert({ ...siteSectionDbFields(input), display_order: count ?? 0 });
+
+  if (error) return { ok: false, error: 'No se pudo crear la sección.' };
+
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function updateSiteSection(id: string, input: SiteSectionInput) {
+  const supabase = await requireUser();
+
+  const validationError = validateSiteSectionInput(input);
+  if (validationError) return { ok: false, error: validationError };
+
+  const { error } = await supabase
+    .from('site_sections')
+    .update(siteSectionDbFields(input))
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar la sección.' };
+
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function setSiteSectionActive(id: string, active: boolean) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('site_sections').update({ active }).eq('id', id);
+  if (error) return { ok: false, error: 'No se pudo actualizar la sección.' };
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function deleteSiteSection(id: string) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('site_sections').delete().eq('id', id);
+  if (error) return { ok: false, error: 'No se pudo eliminar la sección.' };
+  revalidateContenido();
+  return { ok: true };
+}
+
+export async function reorderSiteSections(orderedIds: string[]) {
+  const supabase = await requireUser();
+  const result = await reorderRows(supabase, 'site_sections', orderedIds);
+  revalidateContenido();
+  return result;
 }
 
 interface ExpenseInput {
