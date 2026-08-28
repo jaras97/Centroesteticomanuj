@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import Image from 'next/image';
+import { motion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -17,6 +19,18 @@ import { submitPromoLead } from '@/app/promo-actions';
 import { PROMO_DISMISS_COOKIE_DAYS } from '@/lib/promotions/config';
 import { cn } from '@/lib/utils';
 import type { Promotion } from '@/lib/supabase/types';
+
+const EASE_OUT = [0.16, 1, 0.3, 1] as const;
+
+const container: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
+};
+
+const item: Variants = {
+  hidden: { opacity: 0, y: 14 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE_OUT } },
+};
 
 function dismissCookieName(promotionId: string) {
   return `promo_dismissed_${promotionId}`;
@@ -62,10 +76,8 @@ export default function PromoModal({ promotion }: { promotion: Promotion | null 
   // mostrar debajo — el pie se omite del todo (no solo se oculta) para que
   // el modal se ajuste exactamente al tamaño de la imagen, sin espacio de
   // sobra. La X ya alcanza para cerrarlo, no hace falta "Entendido".
-  const hasFooter =
-    activePromotion.requires_birthday ||
-    !activePromotion.image_only ||
-    !!(activePromotion.cta_label && activePromotion.cta_href);
+  const hasCta = !!(activePromotion.cta_label && activePromotion.cta_href);
+  const hasFooter = activePromotion.requires_birthday || !activePromotion.image_only || hasCta;
 
   function close() {
     setDismissCookie(activePromotion.id);
@@ -98,20 +110,14 @@ export default function PromoModal({ promotion }: { promotion: Promotion | null 
         if (!next) close();
       }}
     >
-      <DialogContent>
+      <DialogContent className='sm:max-w-md overflow-hidden rounded-2xl p-0 gap-0'>
         {promotion.image_url &&
           (promotion.image_only ? (
             // El texto ya está diseñado en la imagen: se muestra completa,
             // sin recortar (object-contain) — un object-cover fijo cortaría
-            // texto que esté cerca de los bordes del flyer. Sin pie (hasFooter
-            // false) se sangra también por abajo para que el modal quede del
-            // tamaño exacto de la imagen.
-            <div
-              className={cn(
-                '-mx-6 -mt-6 overflow-hidden rounded-t-lg bg-gray-100',
-                !hasFooter && '-mb-6 rounded-b-lg',
-              )}
-            >
+            // texto que esté cerca de los bordes del flyer. Sin pie
+            // (hasFooter false) el modal queda del tamaño exacto de la imagen.
+            <div className='overflow-hidden bg-gray-100'>
               {/* eslint-disable-next-line @next/next/no-img-element -- dimensión desconocida (sube Manu), no aplica next/image sin fill/width/height fijos */}
               <img
                 src={promotion.image_url}
@@ -120,100 +126,117 @@ export default function PromoModal({ promotion }: { promotion: Promotion | null 
               />
             </div>
           ) : (
-            <div className='relative -mx-6 -mt-6 h-44 sm:h-52 overflow-hidden rounded-t-lg'>
+            <div className='relative h-48 sm:h-56 overflow-hidden'>
               <Image src={promotion.image_url} alt='' fill className='object-cover' />
+              <div className='absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent' />
             </div>
           ))}
 
-        {/* image_only: el header sale del flujo (sr-only = position:absolute)
-            para que no deje un hueco vacío entre la imagen y lo que sigue. */}
-        <DialogHeader className={promotion.image_only ? 'sr-only' : undefined}>
-          <DialogTitle>{promotion.title}</DialogTitle>
-        </DialogHeader>
+        <motion.div
+          initial='hidden'
+          animate='show'
+          variants={container}
+          className={cn('flex flex-col gap-5', !promotion.image_only && 'p-6 sm:p-8')}
+        >
+          {/* image_only: el header sale del flujo (sr-only = position:absolute)
+              para que no deje un hueco vacío entre la imagen y lo que sigue. */}
+          <DialogHeader className={promotion.image_only ? 'sr-only' : undefined}>
+            <motion.div variants={item}>
+              <DialogTitle className='font-display italic text-3xl leading-tight text-brand-ink'>
+                {promotion.title}
+              </DialogTitle>
+            </motion.div>
+          </DialogHeader>
 
-        {submitted ? (
-          <p className='text-sm text-gray-600'>¡Gracias! Ya registramos tus datos.</p>
-        ) : (
-          <>
-            {!promotion.image_only && promotion.body && (
-              <p className='text-sm text-gray-600 whitespace-pre-line'>{promotion.body}</p>
-            )}
+          {submitted ? (
+            <motion.p variants={item} className='text-gray-600'>
+              ¡Gracias! Ya registramos tus datos.
+            </motion.p>
+          ) : (
+            <>
+              {!promotion.image_only && promotion.body && (
+                <motion.p
+                  variants={item}
+                  className='text-base text-gray-600 leading-relaxed whitespace-pre-line'
+                >
+                  {promotion.body}
+                </motion.p>
+              )}
 
-            {promotion.requires_birthday && (
-              <div className='space-y-3'>
-                <div className='space-y-1.5'>
-                  <Label htmlFor='promo-lead-name'>Nombre</Label>
-                  <Input
-                    id='promo-lead-name'
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-                <div className='space-y-1.5'>
-                  <Label htmlFor='promo-lead-phone'>Teléfono</Label>
-                  <Input
-                    id='promo-lead-phone'
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                </div>
-                <div className='space-y-1.5'>
-                  <Label htmlFor='promo-lead-birthday'>Fecha de nacimiento</Label>
-                  <Input
-                    id='promo-lead-birthday'
-                    type='date'
-                    value={birthday}
-                    onChange={(e) => setBirthday(e.target.value)}
-                  />
-                </div>
+              {promotion.requires_birthday && (
+                <motion.div variants={item} className='space-y-4'>
+                  <div className='space-y-1.5'>
+                    <Label htmlFor='promo-lead-name'>Nombre</Label>
+                    <Input
+                      id='promo-lead-name'
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+                  <div className='space-y-1.5'>
+                    <Label htmlFor='promo-lead-phone'>Teléfono</Label>
+                    <Input
+                      id='promo-lead-phone'
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
+                  </div>
+                  <div className='space-y-1.5'>
+                    <Label htmlFor='promo-lead-birthday'>Fecha de nacimiento</Label>
+                    <Input
+                      id='promo-lead-birthday'
+                      type='date'
+                      value={birthday}
+                      onChange={(e) => setBirthday(e.target.value)}
+                    />
+                  </div>
 
-                {/* Honeypot — invisible para personas, los bots suelen llenarlo. */}
-                <div className='hidden' aria-hidden='true'>
-                  <label htmlFor='promo-lead-website'>No llenar este campo</label>
-                  <input
-                    id='promo-lead-website'
-                    tabIndex={-1}
-                    autoComplete='off'
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                  />
-                </div>
+                  {/* Honeypot — invisible para personas, los bots suelen llenarlo. */}
+                  <div className='hidden' aria-hidden='true'>
+                    <label htmlFor='promo-lead-website'>No llenar este campo</label>
+                    <input
+                      id='promo-lead-website'
+                      tabIndex={-1}
+                      autoComplete='off'
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                    />
+                  </div>
 
-                {error && <p className='text-sm font-medium text-destructive'>{error}</p>}
-              </div>
-            )}
+                  {error && <p className='text-sm font-medium text-destructive'>{error}</p>}
+                </motion.div>
+              )}
 
-            {hasFooter && (
-              <DialogFooter>
-                {promotion.requires_birthday ? (
-                  <Button onClick={handleSubmit} disabled={isPending}>
-                    {isPending && <Loader2 className='h-4 w-4 animate-spin' />}
-                    Enviar
-                  </Button>
-                ) : (
-                  <>
-                    {promotion.cta_label && promotion.cta_href && (
+              {hasFooter && (
+                <motion.div variants={item}>
+                  <DialogFooter>
+                    {promotion.requires_birthday ? (
+                      <Button onClick={handleSubmit} disabled={isPending} className='w-full sm:w-auto'>
+                        {isPending && <Loader2 className='h-4 w-4 animate-spin' />}
+                        Enviar
+                      </Button>
+                    ) : hasCta ? (
+                      // Con CTA no hace falta un segundo botón "Entendido" — la
+                      // X ya cierra el modal, y dos botones lado a lado se
+                      // sentían redundantes.
                       <a
-                        href={promotion.cta_href}
+                        href={promotion.cta_href!}
                         onClick={close}
-                        className='inline-flex items-center justify-center rounded-md px-4 py-2 font-semibold text-white bg-brand-teal hover:bg-brand-teal-dark transition-colors'
+                        className='inline-flex w-full sm:w-auto items-center justify-center rounded-md px-6 py-2.5 font-semibold text-white bg-brand-teal hover:bg-brand-teal-dark transition-colors'
                       >
                         {promotion.cta_label}
                       </a>
-                    )}
-                    {/* En image_only la X ya alcanza para cerrar — no se
-                        duplica con un botón "Entendido". */}
-                    {!promotion.image_only && (
-                      <Button variant='outline' onClick={close}>
+                    ) : (
+                      <Button variant='outline' onClick={close} className='w-full sm:w-auto'>
                         Entendido
                       </Button>
                     )}
-                  </>
-                )}
-              </DialogFooter>
-            )}
-          </>
-        )}
+                  </DialogFooter>
+                </motion.div>
+              )}
+            </>
+          )}
+        </motion.div>
       </DialogContent>
     </Dialog>
   );

@@ -29,13 +29,18 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        // primary/secondary quedaban en hex fijo, sin pasar por el sistema de
+        // theming (hsl(var(--brand-*))) — cualquier botón "default"/
+        // "secondary" (incluidos los del admin) se quedaba con el teal/sand
+        // original aunque Manu cambiara los colores de marca. Se conectan acá
+        // para que todo el sitio, admin incluido, responda al theming.
         primary: {
-          DEFAULT: "#739DAA",
+          DEFAULT: "hsl(var(--brand-teal))",
           foreground: "#ffffff",
         },
         secondary: {
-          DEFAULT: "#D2B8A1",
-          foreground: "#0C0C0C",
+          DEFAULT: "hsl(var(--brand-sand))",
+          foreground: "hsl(var(--brand-ink))",
         },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
