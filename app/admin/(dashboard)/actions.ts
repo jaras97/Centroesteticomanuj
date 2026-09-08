@@ -168,6 +168,128 @@ export async function completeAppointment(
   return { ok: true, loyaltyGranted: granted };
 }
 
+export interface AppointmentDetail {
+  id: string;
+  status: string;
+  start_time: string;
+  end_time: string;
+  duration_min: number;
+  buffer_min: number;
+  charged_amount: number | null;
+  payment_method: string | null;
+  deposit_received_amount: number | null;
+  requested_name: string;
+  client_note: string | null;
+  reject_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  client: { id: string; name: string; phone: string };
+  service: { id: string; name: string; price: number | null; duration_min: number };
+  /** Cupón de fidelización canjeado en esta cita (explica por qué el valor
+   * cobrado es menor al precio de lista). */
+  appliedReward: { id: string; discount_percent: number } | null;
+  /** Cupón que esta cita generó al completarse. */
+  earnedReward: { id: string; discount_percent: number; used_at: string | null } | null;
+}
+
+/**
+ * Detalle completo de una cita, para el diálogo de la agenda. Se carga al
+ * abrir (no viaja con el listado del mes) e incluye lo que la fila de
+ * `appointments` no tiene por sí sola: el cupón aplicado y el generado.
+ */
+export async function getAppointmentDetail(id: string): Promise<AppointmentDetail | null> {
+  const supabase = await requireUser();
+
+  const { data: appointment } = await supabase
+    .from('appointments')
+    .select('*, clients(id, name, phone), services(id, name, price, duration_min)')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!appointment) return null;
+
+  const [{ data: applied }, { data: earned }] = await Promise.all([
+    supabase
+      .from('loyalty_rewards')
+      .select('id, discount_percent')
+      .eq('used_appointment_id', id)
+      .maybeSingle(),
+    supabase
+      .from('loyalty_rewards')
+      .select('id, discount_percent, used_at')
+      .eq('source_appointment_id', id)
+      .maybeSingle(),
+  ]);
+
+  const row = appointment as unknown as {
+    clients: { id: string; name: string; phone: string };
+    services: { id: string; name: string; price: number | null; duration_min: number };
+  } & Record<string, unknown>;
+
+  return {
+    id: row.id as string,
+    status: row.status as string,
+    start_time: row.start_time as string,
+    end_time: row.end_time as string,
+    duration_min: row.duration_min as number,
+    buffer_min: row.buffer_min as number,
+    charged_amount: (row.charged_amount as number | null) ?? null,
+    payment_method: (row.payment_method as string | null) ?? null,
+    deposit_received_amount: (row.deposit_received_amount as number | null) ?? null,
+    requested_name: row.requested_name as string,
+    client_note: (row.client_note as string | null) ?? null,
+    reject_reason: (row.reject_reason as string | null) ?? null,
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
+    client: row.clients,
+    service: row.services,
+    appliedReward: applied ?? null,
+    earnedReward: earned ?? null,
+  };
+}
+
+/**
+ * Corrige el cobro de una cita ya completada. Hasta ahora el monto solo se
+ * podía escribir en la transición CONFIRMADA → COMPLETADA: un error de tecleo
+ * quedaba fijo para siempre en Finanzas. No re-evalúa fidelización (el cupón
+ * se otorga por número de citas, no por monto) ni cambia el estado.
+ */
+export async function updateAppointmentCharge(
+  id: string,
+  input: { chargedAmount: number; paymentMethod?: string },
+) {
+  const supabase = await requireUser();
+
+  const { data: appointment } = await supabase
+    .from('appointments')
+    .select('client_id, status')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!appointment) return { ok: false, error: 'Cita no encontrada.' };
+  if (appointment.status !== 'COMPLETADA') {
+    return { ok: false, error: 'Solo se puede corregir el cobro de una cita completada.' };
+  }
+  if (!Number.isFinite(input.chargedAmount) || input.chargedAmount < 0) {
+    return { ok: false, error: 'El valor cobrado no es válido.' };
+  }
+
+  const { error } = await supabase
+    .from('appointments')
+    .update({
+      charged_amount: Math.round(input.chargedAmount),
+      payment_method: input.paymentMethod || null,
+    })
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar el cobro.' };
+
+  revalidateBooking();
+  revalidatePath('/admin/finanzas');
+  revalidatePath(`/admin/clientes/${appointment.client_id}`);
+  return { ok: true };
+}
+
 export async function markNoShow(id: string) {
   const supabase = await requireUser();
   const { error } = await supabase
@@ -355,22 +477,99 @@ export async function createManualAppointment(input: {
   return { ok: true };
 }
 
-export async function rescheduleAppointment(id: string, newStartTimeIso: string) {
+/** Servicios agendables activos, para el selector del diálogo de edición. */
+export async function getBookableServices() {
   const supabase = await requireUser();
 
+  const { data } = await supabase
+    .from('services')
+    .select('id, name, duration_min, buffer_min, price, deposit_amount')
+    .eq('active', true)
+    .order('name', { ascending: true });
+
+  return data ?? [];
+}
+
+/** Estados en los que la cita todavía no se cerró y admite cambios de
+ * servicio/horario. Una COMPLETADA ya alimentó la contabilidad (y quizá
+ * un cupón de fidelización), así que cambiarle el servicio distorsionaría
+ * el histórico; una CANCELADA/NO_ASISTIO/EXPIRADA ya no ocupa la agenda. */
+const EDITABLE_STATUSES = ['SOLICITADA', 'ESPERANDO_ANTICIPO', 'CONFIRMADA'];
+
+/**
+ * Reemplaza al antiguo `rescheduleAppointment`: cambia servicio, fecha/hora y
+ * duración en una sola operación. Van juntos a propósito — al pasar a un
+ * servicio más largo el horario actual suele dejar de caber, y con diálogos
+ * separados el admin quedaría atascado contra la restricción de solapamiento.
+ *
+ * No hace falta recalcular `end_time`/`appt_range`: el trigger
+ * `set_appointment_range` (migración 0001) los deriva al escribir
+ * start_time/duration_min/buffer_min, y el `exclude using gist` rechaza el
+ * solapamiento con otra cita (error 23P01).
+ */
+export async function updateAppointmentBooking(
+  id: string,
+  input: { serviceId: string; startTimeIso: string; durationMin?: number },
+) {
+  const supabase = await requireUser();
+
+  const { data: appointment } = await supabase
+    .from('appointments')
+    .select('client_id, service_id, status')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!appointment) return { ok: false, error: 'Cita no encontrada.' };
+
+  if (!EDITABLE_STATUSES.includes(appointment.status)) {
+    return {
+      ok: false,
+      error: 'Solo se pueden editar citas solicitadas, esperando anticipo o confirmadas.',
+    };
+  }
+
+  const { data: service } = await supabase
+    .from('services')
+    .select('name, duration_min, buffer_min, active')
+    .eq('id', input.serviceId)
+    .maybeSingle();
+
+  if (!service) return { ok: false, error: 'Servicio inválido.' };
+
+  // Un servicio desactivado sigue siendo válido si es el que la cita ya tenía
+  // (no se fuerza un cambio solo porque salió del catálogo público).
+  if (!service.active && input.serviceId !== appointment.service_id) {
+    return { ok: false, error: 'Ese servicio está inactivo.' };
+  }
+
+  const durationMin =
+    input.durationMin && input.durationMin > 0 ? input.durationMin : service.duration_min;
+
+  // El estado no se toca a propósito: si el servicio nuevo pide anticipo (o
+  // deja de pedirlo), sigue siendo Manu quien decide confirmar — el principio
+  // rector del PRD es que el sistema nunca confirma solo.
   const { error } = await supabase
     .from('appointments')
-    .update({ start_time: newStartTimeIso })
+    .update({
+      service_id: input.serviceId,
+      start_time: input.startTimeIso,
+      duration_min: durationMin,
+      buffer_min: service.buffer_min,
+    })
     .eq('id', id);
 
   if (error) {
     if (error.code === '23P01') {
-      return { ok: false, error: 'Ese horario ya está ocupado.' };
+      return {
+        ok: false,
+        error: `No cabe: ${service.name} ocupa ${durationMin + service.buffer_min} min (con buffer) y se cruza con otra cita. Elige otro horario o ajusta la duración.`,
+      };
     }
-    return { ok: false, error: 'No se pudo reagendar la cita.' };
+    return { ok: false, error: 'No se pudo actualizar la cita.' };
   }
 
   revalidateBooking();
+  revalidatePath(`/admin/clientes/${appointment.client_id}`);
   return { ok: true };
 }
 

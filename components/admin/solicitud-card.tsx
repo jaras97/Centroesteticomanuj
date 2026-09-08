@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import ConfirmDialog from '@/components/admin/confirm-dialog';
 import RejectDialog from '@/components/admin/reject-dialog';
 import DepositReceivedButton from '@/components/admin/deposit-received-button';
-import RescheduleDialog from '@/components/admin/reschedule-dialog';
+import EditAppointmentDialog from '@/components/admin/edit-appointment-dialog';
 import { formatBogotaHuman } from '@/lib/booking/timezone';
 import { buildWhatsAppLink } from '@/lib/whatsapp';
 import { formatCOP } from '@/lib/format';
@@ -91,7 +91,12 @@ export default function SolicitudCard({
               defaultAmount={request.services.deposit_amount}
             />
           )}
-          <RescheduleDialog appointmentId={request.id} currentStartTime={request.start_time} />
+          <EditAppointmentDialog
+            appointmentId={request.id}
+            currentServiceId={request.service_id}
+            currentStartTime={request.start_time}
+            currentDurationMin={request.duration_min}
+          />
           <RejectDialog appointmentId={request.id} />
           <a
             href={buildWhatsAppLink(request.clients.phone, whatsappMessage)}

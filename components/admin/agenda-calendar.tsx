@@ -24,11 +24,14 @@ import './agenda-calendar.css';
 export interface AgendaAppointment {
   id: string;
   client_id: string;
+  service_id: string;
   status: 'SOLICITADA' | 'ESPERANDO_ANTICIPO' | 'CONFIRMADA' | 'COMPLETADA';
   start_time: string;
   end_time: string;
   duration_min: number;
   deposit_received_amount: number | null;
+  charged_amount: number | null;
+  payment_method: string | null;
   clients: { name: string; phone: string };
   services: { name: string; price: number | null };
 }

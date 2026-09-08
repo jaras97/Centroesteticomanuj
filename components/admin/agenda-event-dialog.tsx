@@ -1,16 +1,24 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { ExternalLink, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import RescheduleDialog from '@/components/admin/reschedule-dialog';
+import EditAppointmentDialog from '@/components/admin/edit-appointment-dialog';
+import EditChargeDialog from '@/components/admin/edit-charge-dialog';
 import CompleteAppointmentDialog from '@/components/admin/complete-appointment-dialog';
-import { formatBogotaHuman } from '@/lib/booking/timezone';
+import { formatBogotaHuman, formatTimeStr, toBogotaWallClock } from '@/lib/booking/timezone';
 import { formatCOP } from '@/lib/format';
-import { markNoShow, deleteBlockedSlot } from '@/app/admin/(dashboard)/actions';
+import { buildWhatsAppLink } from '@/lib/whatsapp';
+import {
+  markNoShow,
+  deleteBlockedSlot,
+  getAppointmentDetail,
+  type AppointmentDetail as AppointmentDetailData,
+} from '@/app/admin/(dashboard)/actions';
 import type { AgendaAppointment, AgendaBlockedSlot } from '@/components/admin/agenda-calendar';
 
 export type SelectedAgendaEvent =
@@ -51,7 +59,7 @@ export default function AgendaEventDialog({
 
   return (
     <Dialog open={!!event} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className='max-h-[85vh] overflow-y-auto'>
         {shown?.kind === 'appointment' && (
           <AppointmentDetail
             appointment={shown.data}
@@ -67,6 +75,32 @@ export default function AgendaEventDialog({
   );
 }
 
+/** Fila etiqueta/valor del bloque de cobro. */
+function DetailRow({
+  label,
+  value,
+  emphasis,
+  muted,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+  muted?: boolean;
+}) {
+  return (
+    <div className='flex items-baseline justify-between gap-4'>
+      <span className={muted ? 'text-gray-400' : 'text-gray-500'}>{label}</span>
+      <span
+        className={
+          emphasis ? 'font-semibold text-brand-ink' : muted ? 'text-gray-400' : 'text-brand-ink'
+        }
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function AppointmentDetail({
   appointment,
   isPast,
@@ -77,6 +111,32 @@ function AppointmentDetail({
   onDone: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [detail, setDetail] = useState<AppointmentDetailData | null>(null);
+
+  // El listado de la agenda trae un mes entero de citas: el cupón de
+  // fidelización y demás detalle se cargan solo al abrir esta cita (mismo
+  // patrón perezoso que getAvailableRewards al completar).
+  useEffect(() => {
+    let cancelled = false;
+    setDetail(null);
+    getAppointmentDetail(appointment.id).then((data) => {
+      if (!cancelled) setDetail(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [appointment.id]);
+
+  const isCompleted = appointment.status === 'COMPLETADA';
+  const endWall = toBogotaWallClock(new Date(appointment.end_time));
+
+  const listPrice = detail?.service.price ?? appointment.services.price ?? null;
+  const charged = detail?.charged_amount ?? appointment.charged_amount ?? null;
+  const deposit = detail?.deposit_received_amount ?? appointment.deposit_received_amount ?? null;
+  const paymentMethod = detail?.payment_method ?? appointment.payment_method ?? null;
+  const appliedReward = detail?.appliedReward ?? null;
+  const earnedReward = detail?.earnedReward ?? null;
+  const priceDelta = listPrice != null && charged != null ? charged - listPrice : null;
 
   return (
     <>
@@ -90,23 +150,102 @@ function AppointmentDetail({
       </DialogHeader>
 
       <div className='space-y-1 text-sm'>
-        <p className='text-brand-ink font-medium'>{appointment.services.name}</p>
+        <p className='text-brand-ink font-medium'>
+          {detail?.service.name ?? appointment.services.name}
+        </p>
         <p className='text-gray-500'>
-          {formatBogotaHuman(appointment.start_time)} · {appointment.duration_min} min
+          {formatBogotaHuman(appointment.start_time)} – {formatTimeStr(endWall)} ·{' '}
+          {appointment.duration_min} min
+          {detail && detail.service.duration_min !== appointment.duration_min && (
+            <span className='text-gray-400'> (catálogo: {detail.service.duration_min} min)</span>
+          )}
         </p>
         <p className='text-gray-500'>{appointment.clients.phone}</p>
-        {!!appointment.deposit_received_amount && (
-          <p className='text-emerald-700 font-medium'>
-            💰 Anticipo recibido: {formatCOP(appointment.deposit_received_amount)}
-          </p>
+        {detail?.client_note && (
+          <p className='text-gray-500 italic'>“{detail.client_note}”</p>
         )}
+        {detail &&
+          detail.requested_name.trim().toLowerCase() !==
+            detail.client.name.trim().toLowerCase() && (
+            <p className='text-amber-600'>⚠ Escribió: &quot;{detail.requested_name}&quot;</p>
+          )}
       </div>
+
+      {isCompleted ? (
+        <div className='rounded-lg border bg-gray-50 p-3 space-y-1.5 text-sm'>
+          <p className='font-medium text-brand-ink mb-1'>Detalle del cobro</p>
+
+          {listPrice != null && (
+            <DetailRow label='Valor de lista' value={formatCOP(listPrice)} muted />
+          )}
+
+          {appliedReward && (
+            <DetailRow
+              label={`Cupón de fidelización (−${appliedReward.discount_percent}%)`}
+              value='aplicado'
+              muted
+            />
+          )}
+
+          {charged != null ? (
+            <DetailRow label='Valor cobrado' value={formatCOP(charged)} emphasis />
+          ) : (
+            <p className='text-amber-600'>
+              Esta cita se completó sin registrar el valor cobrado — no suma en Finanzas.
+            </p>
+          )}
+
+          {priceDelta != null && priceDelta !== 0 && (
+            <DetailRow
+              label={priceDelta < 0 ? 'Descuento sobre la lista' : 'Cobrado por encima de la lista'}
+              value={`${priceDelta < 0 ? '−' : '+'}${formatCOP(Math.abs(priceDelta))}`}
+              muted
+            />
+          )}
+
+          {!!deposit && (
+            <>
+              <DetailRow label='Anticipo ya recibido' value={formatCOP(deposit)} />
+              {charged != null && (
+                <DetailRow
+                  label='Saldo cobrado ese día'
+                  value={formatCOP(Math.max(charged - deposit, 0))}
+                  emphasis
+                />
+              )}
+            </>
+          )}
+
+          <DetailRow label='Método de pago' value={paymentMethod ?? 'sin registrar'} muted={!paymentMethod} />
+
+          {earnedReward && (
+            <p className='text-emerald-700 pt-1'>
+              🎉 Esta cita generó un cupón de {earnedReward.discount_percent}%
+              {earnedReward.used_at ? ' (ya usado)' : ' (disponible)'}.
+            </p>
+          )}
+
+          {!detail && (
+            <p className='flex items-center gap-1.5 text-gray-400 pt-1'>
+              <Loader2 className='h-3.5 w-3.5 animate-spin' /> Cargando detalle…
+            </p>
+          )}
+        </div>
+      ) : (
+        !!deposit && (
+          <p className='text-sm text-emerald-700 font-medium'>
+            💰 Anticipo recibido: {formatCOP(deposit)}
+          </p>
+        )
+      )}
 
       <div className='flex flex-wrap gap-2 pt-2'>
         {!isPast && (
-          <RescheduleDialog
+          <EditAppointmentDialog
             appointmentId={appointment.id}
+            currentServiceId={appointment.service_id}
             currentStartTime={appointment.start_time}
+            currentDurationMin={appointment.duration_min}
           />
         )}
         {isPast && appointment.status === 'CONFIRMADA' && (
@@ -137,6 +276,32 @@ function AppointmentDetail({
             </Button>
           </>
         )}
+        {isCompleted && (
+          <EditChargeDialog
+            appointmentId={appointment.id}
+            currentAmount={charged}
+            currentPaymentMethod={paymentMethod}
+            depositReceivedAmount={deposit}
+            onDone={onDone}
+          />
+        )}
+        <a
+          href={buildWhatsAppLink(
+            appointment.clients.phone,
+            `¡Hola ${appointment.clients.name}!`,
+          )}
+          target='_blank'
+          rel='noopener noreferrer'
+        >
+          <Button size='sm' variant='outline'>
+            WhatsApp
+          </Button>
+        </a>
+        <Link href={`/admin/clientes/${appointment.client_id}`}>
+          <Button size='sm' variant='ghost'>
+            Ver ficha <ExternalLink className='h-3.5 w-3.5' />
+          </Button>
+        </Link>
       </div>
     </>
   );
