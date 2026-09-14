@@ -6,6 +6,7 @@ import { ArrowRight, Check } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import type { ServiceCategory } from '@/lib/supabase/types';
+import { gaEvent } from '@/lib/gtag';
 
 // easing cubic-bezier (equivalente a easeOut) — tipado como tupla literal
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
@@ -119,6 +120,16 @@ export default function ServicesSection({ categories }: { categories: ServiceCat
                   <div className='mt-auto'>
                     <Link
                       href='/reservar'
+                      onClick={() =>
+                        gaEvent('click_reservar', {
+                          location: 'servicios',
+                          label: 'Reservar ahora',
+                          // Qué categoría disparó el clic: permite ver en GA
+                          // qué servicio atrae más reservas.
+                          categoria: category.name,
+                          destino: '/reservar',
+                        })
+                      }
                       className='group/link inline-flex items-center gap-2 font-semibold text-brand-ink hover:text-brand-teal transition-colors'
                     >
                       Reservar ahora

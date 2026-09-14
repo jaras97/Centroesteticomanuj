@@ -5,6 +5,7 @@ import StepService, { type WizardService } from '@/components/reservar/step-serv
 import StepDateTime from '@/components/reservar/step-datetime';
 import StepDetails from '@/components/reservar/step-details';
 import Confirmation from '@/components/reservar/confirmation';
+import { gaEvent } from '@/lib/gtag';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -63,6 +64,14 @@ export default function BookingWizard({ services }: { services: WizardService[] 
           services={services}
           onSelect={(selected) => {
             setService(selected);
+            // Embudo: un evento por paso superado. Comparando el volumen de
+            // cada paso contra `reserva_enviada` se ve en qué punto abandona
+            // la gente (elegir servicio, elegir hora o dejar los datos).
+            gaEvent('reserva_paso', {
+              paso: 1,
+              paso_nombre: 'servicio',
+              servicio: selected.name,
+            });
             setStep(2);
           }}
         />
@@ -75,6 +84,11 @@ export default function BookingWizard({ services }: { services: WizardService[] 
           onSelect={(selectedDate, selectedTime) => {
             setDate(selectedDate);
             setTime(selectedTime);
+            gaEvent('reserva_paso', {
+              paso: 2,
+              paso_nombre: 'fecha_hora',
+              servicio: service.name,
+            });
             setStep(3);
           }}
         />
@@ -88,6 +102,14 @@ export default function BookingWizard({ services }: { services: WizardService[] 
           time={time}
           onBack={() => setStep(2)}
           onSuccess={(result) => {
+            // Conversión principal del sitio. Marcar `reserva_enviada` como
+            // evento clave en GA4 (Admin → Eventos) para que cuente como
+            // conversión en los informes.
+            gaEvent('reserva_enviada', {
+              servicio: result.serviceName,
+              fecha: result.date,
+              hora: result.time,
+            });
             setSummary(result);
             setStep(4);
           }}

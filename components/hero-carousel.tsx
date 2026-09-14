@@ -152,7 +152,11 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
                         {slide.description}
                       </motion.p>
                       <motion.div variants={textItemVariants(textDirection)}>
-                        <AnimatedButton label={slide.cta_label} href={slide.cta_href} />
+                        <AnimatedButton
+                          label={slide.cta_label}
+                          href={slide.cta_href}
+                          location='hero'
+                        />
                       </motion.div>
                     </motion.div>
                   </div>
