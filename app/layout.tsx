@@ -8,6 +8,7 @@ import { Suspense } from 'react';
 import { Toaster } from 'sonner';
 import { getSiteSettings } from '@/lib/content/site-settings';
 import { buildThemeOverrideCss } from '@/lib/theme/colors';
+import { Analytics } from '@vercel/analytics/next';
 
 const montserrat = localFont({
   src: [
@@ -147,6 +148,7 @@ export default async function RootLayout({
         </Suspense>
         {children}
         <Toaster richColors position='top-center' />
+        <Analytics />
       </body>
     </html>
   );
