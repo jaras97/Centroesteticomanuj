@@ -240,7 +240,10 @@ function AppointmentDetail({
       )}
 
       <div className='flex flex-wrap gap-2 pt-2'>
-        {!isPast && (
+        {/* También en citas que ya pasaron pero siguen abiertas: el cambio de
+            servicio suele descubrirse al terminar el servicio, no antes. Una
+            COMPLETADA se corrige con el diálogo de abajo. */}
+        {!isCompleted && (
           <EditAppointmentDialog
             appointmentId={appointment.id}
             currentServiceId={appointment.service_id}
@@ -253,7 +256,9 @@ function AppointmentDetail({
             <CompleteAppointmentDialog
               appointmentId={appointment.id}
               clientId={appointment.client_id}
-              defaultAmount={appointment.services.price ?? 0}
+              bookedServiceId={appointment.service_id}
+              bookedServiceName={detail?.service.name ?? appointment.services.name}
+              defaultAmount={listPrice ?? 0}
               depositReceivedAmount={appointment.deposit_received_amount}
               onDone={onDone}
             />
@@ -279,6 +284,8 @@ function AppointmentDetail({
         {isCompleted && (
           <EditChargeDialog
             appointmentId={appointment.id}
+            bookedServiceId={appointment.service_id}
+            bookedServiceName={detail?.service.name ?? appointment.services.name}
             currentAmount={charged}
             currentPaymentMethod={paymentMethod}
             depositReceivedAmount={deposit}

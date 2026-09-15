@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import PerformedServiceSelect from '@/components/admin/performed-service-select';
 import { completeAppointment, getAvailableRewards } from '@/app/admin/(dashboard)/actions';
 import { formatCOP } from '@/lib/format';
 import type { LoyaltyReward } from '@/lib/supabase/types';
@@ -24,17 +25,22 @@ const PAYMENT_METHODS = ['Efectivo', 'Transferencia', 'Tarjeta', 'Otro'];
 export default function CompleteAppointmentDialog({
   appointmentId,
   clientId,
+  bookedServiceId,
+  bookedServiceName,
   defaultAmount,
   depositReceivedAmount,
   onDone,
 }: {
   appointmentId: string;
   clientId: string;
+  bookedServiceId: string;
+  bookedServiceName: string;
   defaultAmount: number;
   depositReceivedAmount?: number | null;
   onDone: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [serviceId, setServiceId] = useState(bookedServiceId);
   const [amount, setAmount] = useState(String(defaultAmount || ''));
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [rewards, setRewards] = useState<LoyaltyReward[]>([]);
@@ -45,6 +51,20 @@ export default function CompleteAppointmentDialog({
     if (!open) return;
     getAvailableRewards(clientId).then(setRewards);
   }, [open, clientId]);
+
+  // Al reabrir se vuelve a partir de lo agendado (mismo criterio que el
+  // diálogo de editar cita).
+  useEffect(() => {
+    if (open) return;
+    setServiceId(bookedServiceId);
+    setAmount(String(defaultAmount || ''));
+  }, [open, bookedServiceId, defaultAmount]);
+
+  /** Si cambió el servicio, el valor cobrado parte del precio del nuevo. */
+  function handleServiceChange(nextId: string, service?: { price: number | null }) {
+    setServiceId(nextId);
+    if (service?.price != null) setAmount(String(service.price));
+  }
 
   const reward = rewards[0];
   const baseAmount = Number(amount) || 0;
@@ -57,6 +77,7 @@ export default function CompleteAppointmentDialog({
         chargedAmount: finalAmount,
         paymentMethod: paymentMethod || undefined,
         appliedRewardId: applyReward ? reward?.id : undefined,
+        serviceId: serviceId !== bookedServiceId ? serviceId : undefined,
       });
       if (!result.ok) {
         toast.error(result.error);
@@ -81,11 +102,21 @@ export default function CompleteAppointmentDialog({
           <DialogHeader>
             <DialogTitle>Completar cita</DialogTitle>
             <DialogDescription>
-              Registra el valor cobrado para llevar la contabilidad del centro.
+              Registra qué servicio se hizo y cuánto se cobró, para llevar la contabilidad del
+              centro.
             </DialogDescription>
           </DialogHeader>
 
           <div className='space-y-4'>
+            <PerformedServiceSelect
+              open={open}
+              value={serviceId}
+              bookedServiceId={bookedServiceId}
+              bookedServiceName={bookedServiceName}
+              bookedServicePrice={defaultAmount || null}
+              onChange={handleServiceChange}
+            />
+
             <div className='space-y-2'>
               <Label htmlFor='charged-amount'>Valor cobrado</Label>
               <Input

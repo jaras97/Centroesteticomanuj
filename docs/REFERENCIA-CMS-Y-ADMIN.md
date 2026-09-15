@@ -95,7 +95,18 @@ Todas en `app/admin/(dashboard)/actions.ts` salvo las dos marcadas como pública
 - `app/promo-actions.ts` → `submitPromoLead(input)` — captura del modal de promoción cuando `requires_birthday=true`. Mismo patrón anti-abuso y de no-sobreescritura que `createBookingRequest`.
 
 ### Agendamiento (sin cambios funcionales esta sesión, listadas por completitud)
-`confirmAppointment`, `markDepositReceived`, `rejectAppointment`, `completeAppointment`, `markNoShow`, `createBlockedSlot`, `deleteBlockedSlot`, `createAvailabilityWindow`, `deleteAvailabilityWindow`, `searchClients`, `createManualAppointment`, `updateAppointmentBooking` (servicio + fecha/hora + duración de una cita no cerrada; reemplaza al antiguo `rescheduleAppointment`), `getBookableServices`, `getAppointmentDetail` (detalle completo de una cita para el diálogo de la agenda, incluye cupón aplicado/generado), `updateAppointmentCharge` (corrige el cobro de una cita ya COMPLETADA), `createClientRecord`, `updateClient`, `updateClientNotes`, `createService`, `updateService`, `setServiceActive`, `createExpense`, `updateExpense`, `deleteExpense`, `getAvailableRewards`, `signOut`. Ver `docs/PRD-agendamiento.md` y `docs/HANDOFF-fase-*.md` para el diseño de cada una.
+`confirmAppointment`, `markDepositReceived`, `rejectAppointment`, `completeAppointment` (cierra la cita: registra servicio realizado + valor cobrado + método de pago, y evalúa fidelización), `markNoShow`, `createBlockedSlot`, `deleteBlockedSlot`, `createAvailabilityWindow`, `deleteAvailabilityWindow`, `searchClients`, `createManualAppointment`, `updateAppointmentBooking` (servicio + fecha/hora + duración de una cita no cerrada; reemplaza al antiguo `rescheduleAppointment`), `getBookableServices`, `getAppointmentDetail` (detalle completo de una cita para el diálogo de la agenda, incluye cupón aplicado/generado), `updateAppointmentCharge` (corrige servicio realizado + cobro de una cita ya COMPLETADA), `createClientRecord`, `updateClient`, `updateClientNotes`, `createService`, `updateService`, `setServiceActive`, `createExpense`, `updateExpense`, `deleteExpense`, `getAvailableRewards`, `signOut`. Ver `docs/PRD-agendamiento.md` y `docs/HANDOFF-fase-*.md` para el diseño de cada una.
+
+#### Servicio agendado vs. servicio realizado
+La clienta cambia de servicio en el puesto con frecuencia, y eso normalmente se descubre **al terminar**, no antes. Por eso el servicio de una cita se puede cambiar en tres momentos, y no solo mientras la cita está en el futuro:
+
+1. Antes de que ocurra, o mientras sigue abierta → `updateAppointmentBooking` (servicio + fecha/hora + duración). El botón "Editar cita" del diálogo de la agenda ya no se esconde cuando la cita quedó en el pasado: se esconde solo cuando está COMPLETADA.
+2. Al cerrarla → el diálogo "Completar cita" tiene un selector **"Servicio realizado"** (`components/admin/performed-service-select.tsx`, compartido) que precarga el agendado; al cambiarlo propone el precio del servicio nuevo como valor cobrado.
+3. Después de cerrada → "Corregir cita completada" (`updateAppointmentCharge`) admite servicio + valor + método de pago.
+
+En los casos 2 y 3 **solo** se reescribe `service_id`: `duration_min`/`buffer_min` se dejan como quedaron (es el tiempo que la cita realmente ocupó en la agenda, y reescribirlos podría chocar con la cita siguiente vía el `exclude using gist`). Cambiar el servicio de una COMPLETADA es seguro: la fidelización cuenta citas, no servicios ni montos, y Finanzas agrupa por `service_id` sumando `charged_amount` — re-atribuir es exactamente lo que se busca corregir.
+
+**Limitación conocida**: una cita = un servicio. Si la clienta se hace dos cosas, el monto absorbe la diferencia pero el desglose por servicio de Finanzas solo cuenta una. La solución sería una tabla de líneas (`appointment_services`); no está construida.
 
 ## Supabase Storage
 

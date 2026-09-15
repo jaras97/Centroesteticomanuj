@@ -116,19 +116,62 @@ export async function getAvailableRewards(clientId: string) {
   return getAvailableRewardsForClient(supabase, clientId);
 }
 
+/**
+ * Valida el servicio que se registra como realizado en una cita que ya
+ * ocurrió (al completarla o al corregirla después). Es común que la clienta
+ * cambie de servicio en el puesto, y hasta ahora eso solo se podía registrar
+ * mientras la cita no hubiera pasado: al cerrarla quedaba el equivocado.
+ *
+ * Solo resuelve `service_id`. La duración y el buffer se dejan como quedaron:
+ * son el tiempo que la cita realmente ocupó en la agenda, y reescribirlos
+ * podría chocar con la cita siguiente vía el `exclude using gist`.
+ */
+async function resolvePerformedServiceId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  currentServiceId: string,
+  serviceId: string | undefined,
+): Promise<{ ok: true; serviceId: string | null } | { ok: false; error: string }> {
+  if (!serviceId || serviceId === currentServiceId) return { ok: true, serviceId: null };
+
+  const { data: service } = await supabase
+    .from('services')
+    .select('id, active')
+    .eq('id', serviceId)
+    .maybeSingle();
+
+  if (!service) return { ok: false, error: 'Servicio inválido.' };
+  if (!service.active) return { ok: false, error: 'Ese servicio está inactivo.' };
+
+  return { ok: true, serviceId: service.id };
+}
+
 export async function completeAppointment(
   id: string,
-  input: { chargedAmount: number; paymentMethod?: string; appliedRewardId?: string },
+  input: {
+    chargedAmount: number;
+    paymentMethod?: string;
+    appliedRewardId?: string;
+    /** Servicio realmente realizado, si difiere del agendado. */
+    serviceId?: string;
+  },
 ) {
   const supabase = await requireUser();
 
   const { data: appointment } = await supabase
     .from('appointments')
-    .select('client_id')
+    .select('client_id, service_id')
     .eq('id', id)
     .maybeSingle();
 
   if (!appointment) return { ok: false, error: 'Cita no encontrada.' };
+
+  // Antes de tocar el cupón: si el servicio no es válido, no se quema nada.
+  const performed = await resolvePerformedServiceId(
+    supabase,
+    appointment.service_id,
+    input.serviceId,
+  );
+  if (!performed.ok) return { ok: false, error: performed.error };
 
   if (input.appliedRewardId) {
     const { data: reward } = await supabase
@@ -155,6 +198,7 @@ export async function completeAppointment(
       status: 'COMPLETADA',
       charged_amount: input.chargedAmount,
       payment_method: input.paymentMethod || null,
+      ...(performed.serviceId && { service_id: performed.serviceId }),
     })
     .eq('id', id);
 
@@ -249,40 +293,50 @@ export async function getAppointmentDetail(id: string): Promise<AppointmentDetai
 }
 
 /**
- * Corrige el cobro de una cita ya completada. Hasta ahora el monto solo se
- * podía escribir en la transición CONFIRMADA → COMPLETADA: un error de tecleo
- * quedaba fijo para siempre en Finanzas. No re-evalúa fidelización (el cupón
- * se otorga por número de citas, no por monto) ni cambia el estado.
+ * Corrige una cita ya completada: servicio realizado, valor cobrado y método
+ * de pago. Hasta ahora esos datos solo se podían escribir en la transición
+ * CONFIRMADA → COMPLETADA, así que un error de tecleo — o un cambio de
+ * servicio que se descubrió al cerrar la cita — quedaba fijo para siempre en
+ * Finanzas. No re-evalúa fidelización (el cupón se otorga por número de
+ * citas, no por servicio ni monto) ni cambia el estado.
  */
 export async function updateAppointmentCharge(
   id: string,
-  input: { chargedAmount: number; paymentMethod?: string },
+  input: { chargedAmount: number; paymentMethod?: string; serviceId?: string },
 ) {
   const supabase = await requireUser();
 
   const { data: appointment } = await supabase
     .from('appointments')
-    .select('client_id, status')
+    .select('client_id, status, service_id')
     .eq('id', id)
     .maybeSingle();
 
   if (!appointment) return { ok: false, error: 'Cita no encontrada.' };
   if (appointment.status !== 'COMPLETADA') {
-    return { ok: false, error: 'Solo se puede corregir el cobro de una cita completada.' };
+    return { ok: false, error: 'Solo se puede corregir una cita completada.' };
   }
   if (!Number.isFinite(input.chargedAmount) || input.chargedAmount < 0) {
     return { ok: false, error: 'El valor cobrado no es válido.' };
   }
+
+  const performed = await resolvePerformedServiceId(
+    supabase,
+    appointment.service_id,
+    input.serviceId,
+  );
+  if (!performed.ok) return { ok: false, error: performed.error };
 
   const { error } = await supabase
     .from('appointments')
     .update({
       charged_amount: Math.round(input.chargedAmount),
       payment_method: input.paymentMethod || null,
+      ...(performed.serviceId && { service_id: performed.serviceId }),
     })
     .eq('id', id);
 
-  if (error) return { ok: false, error: 'No se pudo actualizar el cobro.' };
+  if (error) return { ok: false, error: 'No se pudo actualizar la cita.' };
 
   revalidateBooking();
   revalidatePath('/admin/finanzas');
@@ -491,9 +545,10 @@ export async function getBookableServices() {
 }
 
 /** Estados en los que la cita todavía no se cerró y admite cambios de
- * servicio/horario. Una COMPLETADA ya alimentó la contabilidad (y quizá
- * un cupón de fidelización), así que cambiarle el servicio distorsionaría
- * el histórico; una CANCELADA/NO_ASISTIO/EXPIRADA ya no ocupa la agenda. */
+ * servicio/horario. Una COMPLETADA no entra aquí porque mover su horario ya
+ * no tiene sentido (ocurrió a la hora que ocurrió); el servicio y el cobro sí
+ * se le pueden corregir, por `updateAppointmentCharge`. Una
+ * CANCELADA/NO_ASISTIO/EXPIRADA ya no ocupa la agenda. */
 const EDITABLE_STATUSES = ['SOLICITADA', 'ESPERANDO_ANTICIPO', 'CONFIRMADA'];
 
 /**

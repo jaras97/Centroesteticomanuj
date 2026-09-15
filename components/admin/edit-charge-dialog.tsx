@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Pencil } from 'lucide-react';
 import {
@@ -21,33 +21,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import PerformedServiceSelect from '@/components/admin/performed-service-select';
 import { formatCOP } from '@/lib/format';
 import { updateAppointmentCharge } from '@/app/admin/(dashboard)/actions';
 
 const PAYMENT_METHODS = ['Efectivo', 'Transferencia', 'Tarjeta', 'Otro'];
 
 /**
- * Corrige el valor cobrado / método de pago de una cita ya completada.
- * Antes esto solo se podía escribir al marcar la cita como completada, así
- * que un monto mal digitado quedaba fijo para siempre en Finanzas.
+ * Corrige una cita ya completada: servicio realizado, valor cobrado y método
+ * de pago. Antes esto solo se podía escribir al marcarla como completada, así
+ * que un monto mal digitado — o un cambio de servicio que solo se notó al
+ * cerrar la cita — quedaba fijo para siempre en Finanzas.
  */
 export default function EditChargeDialog({
   appointmentId,
+  bookedServiceId,
+  bookedServiceName,
   currentAmount,
   currentPaymentMethod,
   depositReceivedAmount,
   onDone,
 }: {
   appointmentId: string;
+  bookedServiceId: string;
+  bookedServiceName: string;
   currentAmount: number | null;
   currentPaymentMethod: string | null;
   depositReceivedAmount: number | null;
   onDone?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [serviceId, setServiceId] = useState(bookedServiceId);
   const [amount, setAmount] = useState(currentAmount != null ? String(currentAmount) : '');
   const [paymentMethod, setPaymentMethod] = useState(currentPaymentMethod ?? '');
   const [isPending, startTransition] = useTransition();
+
+  // Al reabrir se vuelve a partir de lo que tiene guardado la cita.
+  useEffect(() => {
+    if (open) return;
+    setServiceId(bookedServiceId);
+    setAmount(currentAmount != null ? String(currentAmount) : '');
+    setPaymentMethod(currentPaymentMethod ?? '');
+  }, [open, bookedServiceId, currentAmount, currentPaymentMethod]);
 
   const baseAmount = Number(amount) || 0;
 
@@ -56,12 +71,13 @@ export default function EditChargeDialog({
       const result = await updateAppointmentCharge(appointmentId, {
         chargedAmount: baseAmount,
         paymentMethod: paymentMethod || undefined,
+        serviceId: serviceId !== bookedServiceId ? serviceId : undefined,
       });
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
-      toast.success('Cobro actualizado.');
+      toast.success('Cita actualizada.');
       setOpen(false);
       onDone?.();
     });
@@ -71,20 +87,30 @@ export default function EditChargeDialog({
     <>
       <Button size='sm' variant='outline' onClick={() => setOpen(true)}>
         <Pencil className='h-3.5 w-3.5' />
-        {currentAmount == null ? 'Registrar cobro' : 'Corregir cobro'}
+        {currentAmount == null ? 'Registrar cobro' : 'Corregir cita'}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {currentAmount == null ? 'Registrar cobro' : 'Corregir cobro'}
+              {currentAmount == null ? 'Registrar cobro' : 'Corregir cita completada'}
             </DialogTitle>
             <DialogDescription>
-              Esta cita ya está completada. El cambio se refleja de inmediato en Finanzas.
+              Esta cita ya está completada. Puedes corregir el servicio que se realizó y el cobro;
+              el cambio se refleja de inmediato en Finanzas.
             </DialogDescription>
           </DialogHeader>
 
           <div className='space-y-4'>
+            <PerformedServiceSelect
+              open={open}
+              value={serviceId}
+              bookedServiceId={bookedServiceId}
+              bookedServiceName={bookedServiceName}
+              bookedServicePrice={currentAmount}
+              onChange={(nextId) => setServiceId(nextId)}
+            />
+
             <div className='space-y-2'>
               <Label htmlFor='edit-charged-amount'>Valor cobrado</Label>
               <Input
