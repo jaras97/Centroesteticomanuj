@@ -130,7 +130,11 @@ export default function AboutSection({
             </motion.p>
 
             <motion.div variants={item}>
-              <AnimatedButton label='Reservar cita' href='/reservar' />
+              <AnimatedButton
+                label='Reservar cita'
+                href='/reservar'
+                location='sobre_nosotros'
+              />
             </motion.div>
           </div>
         </motion.div>

@@ -9,6 +9,7 @@ import { Toaster } from 'sonner';
 import { getSiteSettings } from '@/lib/content/site-settings';
 import { buildThemeOverrideCss } from '@/lib/theme/colors';
 import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const montserrat = localFont({
   src: [
@@ -149,6 +150,12 @@ export default async function RootLayout({
         {children}
         <Toaster richColors position='top-center' />
         <Analytics />
+        {/* Core Web Vitals de usuarios reales (LCP/CLS/INP). Interesa en
+            este sitio porque el home carga carrusel con video e imágenes
+            grandes desde Storage y next/image va sin optimizar
+            (images.unoptimized en next.config.mjs). Ambos componentes se
+            auto-desactivan fuera de Vercel, así que no afectan a pnpm dev. */}
+        <SpeedInsights />
       </body>
     </html>
   );

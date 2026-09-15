@@ -192,7 +192,11 @@ export default function Header({ logoUrl, phoneDisplay, instagramUrl, facebookUr
                 <DynamicIcon name='facebook' size={24} />
               </Link>
             </div>
-            <AnimatedButton label='Reservar cita' href='/reservar' />
+            <AnimatedButton
+              label='Reservar cita'
+              href='/reservar'
+              location='header'
+            />
           </motion.div>
 
           {/* Mobile menu button */}
@@ -267,7 +271,11 @@ export default function Header({ logoUrl, phoneDisplay, instagramUrl, facebookUr
                     </Link>
                   </motion.div>
                   <motion.div variants={mobileItem} custom={navigation.length}>
-                    <AnimatedButton label='Reservar cita' href='/reservar' />
+                    <AnimatedButton
+                      label='Reservar cita'
+                      href='/reservar'
+                      location='header_movil'
+                    />
                   </motion.div>
                 </div>
               </nav>
