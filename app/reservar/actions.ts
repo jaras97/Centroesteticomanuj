@@ -1,6 +1,7 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { after } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { getAvailableSlots, type DayAvailability } from '@/lib/booking/availability';
 import { bookingRequestSchema } from '@/lib/booking/schemas';
@@ -10,7 +11,12 @@ import {
   BOOKING_HORIZON_WEEKS,
   REQUEST_EXPIRATION_HOURS,
 } from '@/lib/booking/config';
-import { bogotaWallTimeToUtc } from '@/lib/booking/timezone';
+import { bogotaWallTimeToUtc, formatDateStrHuman } from '@/lib/booking/timezone';
+import {
+  enqueueBookingRequested,
+  loadNotificationContext,
+} from '@/lib/notifications/enqueue';
+import { dispatchQuietly } from '@/lib/notifications/dispatch';
 
 export async function getAvailability(serviceId: string): Promise<DayAvailability[]> {
   return getAvailableSlots(serviceId);
@@ -80,6 +86,8 @@ export async function createBookingRequest(
     return { ok: false, error: 'El servicio seleccionado ya no está disponible.' };
   }
 
+  const email = data.email?.trim() || null;
+
   // El teléfono es la llave de dedupe, pero el nombre de un cliente
   // existente NUNCA se sobreescribe desde el formulario público — de lo
   // contrario cualquiera podría "renombrar" a otra persona con solo
@@ -88,7 +96,7 @@ export async function createBookingRequest(
   // appointments.requested_name, para no perder trazabilidad.
   const { data: existingClient, error: lookupError } = await supabase
     .from('clients')
-    .select('id')
+    .select('id, email')
     .eq('phone', data.phone)
     .maybeSingle();
 
@@ -97,11 +105,14 @@ export async function createBookingRequest(
   }
 
   let clientId = existingClient?.id;
+  // Correo efectivo para las notificaciones de ESTA solicitud: el que ya
+  // estaba guardado manda sobre el que se acaba de escribir.
+  let clientEmail: string | null = existingClient?.email ?? email;
 
   if (!clientId) {
     const { data: newClient, error: insertError } = await supabase
       .from('clients')
-      .insert({ name: data.name, phone: data.phone })
+      .insert({ name: data.name, phone: data.phone, email })
       .select('id')
       .single();
 
@@ -109,23 +120,34 @@ export async function createBookingRequest(
       return { ok: false, error: 'No pudimos registrar tus datos, intenta de nuevo.' };
     }
     clientId = newClient.id;
+  } else if (email && !existingClient?.email) {
+    // Mismo criterio que con el nombre: se RELLENA si estaba vacío, nunca
+    // se pisa un correo ya registrado desde el formulario público (si no,
+    // cualquiera podría redirigir las notificaciones de otra persona con
+    // solo conocer su teléfono). Cambiarlo es cosa del panel admin.
+    await supabase.from('clients').update({ email }).eq('id', clientId).is('email', null);
+    clientEmail = email;
   }
 
   const expiresAt = new Date(
     now.getTime() + REQUEST_EXPIRATION_HOURS * 60 * 60_000,
   );
 
-  const { error: appointmentError } = await supabase.from('appointments').insert({
-    client_id: clientId,
-    service_id: service.id,
-    status: 'SOLICITADA',
-    start_time: startTime.toISOString(),
-    duration_min: service.duration_min,
-    buffer_min: service.buffer_min,
-    requested_name: data.name,
-    client_note: data.note || null,
-    expires_at: expiresAt.toISOString(),
-  });
+  const { data: appointment, error: appointmentError } = await supabase
+    .from('appointments')
+    .insert({
+      client_id: clientId,
+      service_id: service.id,
+      status: 'SOLICITADA',
+      start_time: startTime.toISOString(),
+      duration_min: service.duration_min,
+      buffer_min: service.buffer_min,
+      requested_name: data.name,
+      client_note: data.note || null,
+      expires_at: expiresAt.toISOString(),
+    })
+    .select('id')
+    .single();
 
   if (appointmentError) {
     if (appointmentError.code === '23505') {
@@ -141,6 +163,30 @@ export async function createBookingRequest(
       };
     }
     return { ok: false, error: 'No pudimos enviar tu solicitud, intenta de nuevo.' };
+  }
+
+  // Notificaciones: efecto secundario, NUNCA parte del éxito de la reserva.
+  // Todo va dentro de try/catch y el despacho corre en `after()` (después de
+  // responderle a la clienta), así un fallo de Resend no rompe ni demora la
+  // solicitud: la notificación queda FALLIDO en el outbox y se reintenta
+  // desde /admin/notificaciones.
+  if (appointment) {
+    try {
+      const context = await loadNotificationContext(supabase);
+      await enqueueBookingRequested(supabase, context, {
+        appointmentId: appointment.id,
+        clientId,
+        clientName: data.name,
+        clientPhone: data.phone,
+        clientEmail,
+        serviceName: service.name,
+        fecha: formatDateStrHuman(data.date),
+        hora: data.time,
+      });
+      after(() => dispatchQuietly(supabase));
+    } catch (err) {
+      console.error('[notificaciones] no se pudo notificar la nueva solicitud', err);
+    }
   }
 
   return {

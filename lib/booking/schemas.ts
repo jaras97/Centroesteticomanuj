@@ -13,6 +13,15 @@ export const bookingRequestSchema = z.object({
     .string()
     .trim()
     .regex(/^\+?[0-9]{7,15}$/, 'Escribe un número de teléfono válido'),
+  // Opcional a propósito: pedirlo obligatorio agrega fricción a la reserva.
+  // Si viene, se valida y habilita las notificaciones por correo.
+  email: z
+    .string()
+    .trim()
+    .max(120, 'Correo muy largo')
+    .email('Escribe un correo válido')
+    .optional()
+    .or(z.literal('')),
   note: z.string().trim().max(300, 'Nota muy larga').optional().or(z.literal('')),
   // Honeypot: los usuarios reales nunca llenan este campo.
   website: z.string().max(0).optional().or(z.literal('')),
@@ -23,6 +32,7 @@ export type BookingRequestInput = z.infer<typeof bookingRequestSchema>;
 export const stepDetailsSchema = bookingRequestSchema.pick({
   name: true,
   phone: true,
+  email: true,
   note: true,
   website: true,
 });

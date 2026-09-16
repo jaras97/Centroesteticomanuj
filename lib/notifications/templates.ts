@@ -1,0 +1,248 @@
+// Renderizado de plantillas: reemplaza las variables {{...}} y arma el
+// cuerpo final según el canal. Puro TypeScript, sin dependencias de servidor:
+// el editor del panel lo importa desde un componente 'use client' para
+// mostrar la vista previa en vivo con los mismos valores que se enviarían.
+
+import type {
+  NotificationChannel,
+  NotificationEvent,
+  NotificationTemplate,
+  RenderedMessage,
+  TemplateVars,
+} from './types';
+
+/**
+ * Escapa HTML. NO es opcional: `{{cliente}}` sale del formulario público de
+ * /reservar, así que un nombre con `<script>` terminaría dentro del HTML del
+ * correo. Se aplica a los VALORES interpolados, no al texto de la plantilla
+ * (ese lo escribe Manu desde el panel, es contenido de confianza).
+ */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Limpia un valor que va a terminar en una CABECERA de correo (el asunto).
+ *
+ * El asunto no se escapa como HTML a propósito (saldría "&amp;" visible en la
+ * bandeja de entrada), pero sí hay que quitarle los saltos de línea y los
+ * caracteres de control: `{{cliente}}` viene del formulario público y un
+ * nombre con un CR/LF adentro es el vector clásico de inyección de cabeceras.
+ */
+export function sanitizeHeaderValue(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\r\n\x00-\x1f\x7f]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+const VARIABLE_PATTERN = /\{\{\s*([a-z_]+)\s*\}\}/g;
+
+/**
+ * Reemplaza `{{variable}}` por su valor. Una variable desconocida se
+ * reemplaza por cadena vacía (mejor un hueco que un `{{typo}}` visible en el
+ * correo de una clienta).
+ */
+function interpolate(
+  text: string,
+  vars: TemplateVars,
+  transform: (value: string) => string,
+): string {
+  return text.replace(VARIABLE_PATTERN, (_match, key: string) =>
+    transform(vars[key] ?? ''),
+  );
+}
+
+/** Convierte texto plano (como lo escribe Manu) en párrafos HTML. */
+function textToHtmlParagraphs(text: string): string {
+  return text
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => `<p style="margin:0 0 16px;">${block.replace(/\n/g, '<br />')}</p>`)
+    .join('\n');
+}
+
+// Colores de marca por defecto. En un correo no se pueden usar las variables
+// CSS del sitio (ningún cliente de correo las resuelve), por eso acá sí van
+// literales — es el único lugar del proyecto donde eso es correcto.
+const EMAIL_INK = '#0C0C0C';
+const EMAIL_SAND = '#D2B8A1';
+const EMAIL_MUTED = '#8A8A8A';
+
+/** Envuelve el cuerpo en una plantilla HTML sobria, legible en móvil. */
+export function buildEmailHtml(options: {
+  bodyHtml: string;
+  businessName: string;
+  /** Línea extra al pie (p. ej. la nota de baja del correo de cumpleaños). */
+  footerNote?: string;
+}): string {
+  const { bodyHtml, businessName, footerNote } = options;
+  return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escapeHtml(businessName)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F7F4F1;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F4F1;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#FFFFFF;border-radius:12px;overflow:hidden;">
+          <tr>
+            <td style="background-color:${EMAIL_INK};padding:24px 28px;">
+              <p style="margin:0;color:${EMAIL_SAND};font-family:Georgia,'Times New Roman',serif;font-size:20px;font-style:italic;letter-spacing:0.5px;">
+                ${escapeHtml(businessName)}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px;color:${EMAIL_INK};font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;">
+${bodyHtml}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 28px;">
+              <hr style="border:none;border-top:1px solid #EDE7E2;margin:0 0 16px;" />
+              <p style="margin:0;color:${EMAIL_MUTED};font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;">
+                ${escapeHtml(businessName)}${footerNote ? `<br />${footerNote}` : ''}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Nota de baja del correo de cumpleaños. Es marketing (Ley 1581 de 2012), no
+ * transaccional: tiene que ofrecer cómo darse de baja. Manu marca el
+ * `marketing_opt_out` de la clienta desde su ficha en /admin/clientes.
+ */
+export function buildUnsubscribeNote(contact: string): string {
+  const safe = escapeHtml(contact || '');
+  return safe
+    ? `¿Prefieres no recibir estos saludos? Escríbenos a ${safe} y te damos de baja.`
+    : '¿Prefieres no recibir estos saludos? Respóndenos este correo y te damos de baja.';
+}
+
+/**
+ * Renderiza una plantilla para su canal.
+ * - Correo: los valores se escapan y el cuerpo se envuelve en HTML.
+ * - WhatsApp: texto plano tal cual, sin escapar (iría al link `wa.me` como
+ *   `&amp;` literal si se escapara).
+ */
+export function renderTemplate(
+  template: Pick<NotificationTemplate, 'event' | 'channel' | 'subject' | 'body'>,
+  vars: TemplateVars,
+  options?: { businessName?: string; footerNote?: string },
+): RenderedMessage {
+  const text = interpolate(template.body, vars, (v) => v);
+
+  if (template.channel === 'whatsapp') {
+    return { subject: null, body: text, text };
+  }
+
+  // El asunto viaja en una cabecera de correo: es texto plano, escapar
+  // HTML ahí produciría "&amp;" visible en la bandeja de entrada. Lo que sí
+  // se le quita son los saltos de línea y los caracteres de control
+  // (inyección de cabeceras) — ver `sanitizeHeaderValue`.
+  const subject = template.subject
+    ? sanitizeHeaderValue(interpolate(template.subject, vars, sanitizeHeaderValue))
+    : null;
+
+  const escapedBody = interpolate(template.body, vars, escapeHtml);
+  const body = buildEmailHtml({
+    bodyHtml: textToHtmlParagraphs(escapedBody),
+    businessName: options?.businessName ?? vars.negocio ?? 'Centro Estético Manuj',
+    footerNote: options?.footerNote,
+  });
+
+  return { subject, body, text };
+}
+
+// ---------------------------------------------------------------------------
+// Metadatos para la UI del panel
+// ---------------------------------------------------------------------------
+
+export interface TemplateVariable {
+  key: string;
+  label: string;
+}
+
+const VAR_CLIENTE: TemplateVariable = { key: 'cliente', label: 'Nombre de la clienta' };
+const VAR_SERVICIO: TemplateVariable = { key: 'servicio', label: 'Servicio solicitado' };
+const VAR_FECHA: TemplateVariable = { key: 'fecha', label: 'Fecha de la cita' };
+const VAR_HORA: TemplateVariable = { key: 'hora', label: 'Hora de la cita' };
+const VAR_NEGOCIO: TemplateVariable = { key: 'negocio', label: 'Nombre del centro' };
+const VAR_TELEFONO: TemplateVariable = { key: 'telefono', label: 'WhatsApp del centro' };
+const VAR_TELEFONO_CLIENTE: TemplateVariable = {
+  key: 'telefono_cliente',
+  label: 'Teléfono de la clienta',
+};
+
+/** Variables disponibles en cada evento (lo que se muestra clickeable en el editor). */
+export const EVENT_VARIABLES: Record<NotificationEvent, TemplateVariable[]> = {
+  booking_requested: [
+    VAR_CLIENTE,
+    VAR_SERVICIO,
+    VAR_FECHA,
+    VAR_HORA,
+    VAR_NEGOCIO,
+    VAR_TELEFONO,
+    VAR_TELEFONO_CLIENTE,
+  ],
+  appointment_reminder: [
+    VAR_CLIENTE,
+    VAR_SERVICIO,
+    VAR_FECHA,
+    VAR_HORA,
+    VAR_NEGOCIO,
+    VAR_TELEFONO,
+    VAR_TELEFONO_CLIENTE,
+  ],
+  birthday: [VAR_CLIENTE, VAR_NEGOCIO, VAR_TELEFONO, VAR_TELEFONO_CLIENTE],
+};
+
+export const EVENT_LABELS: Record<NotificationEvent, string> = {
+  booking_requested: 'Nueva solicitud de cita',
+  appointment_reminder: 'Recordatorio de cita',
+  birthday: 'Saludo de cumpleaños',
+};
+
+export const EVENT_DESCRIPTIONS: Record<NotificationEvent, string> = {
+  booking_requested:
+    'Se dispara apenas alguien envía el formulario de /reservar. Le avisa a Manu y le confirma a la clienta que su solicitud llegó.',
+  appointment_reminder:
+    'Lo encola el proceso diario para las citas CONFIRMADAS del día siguiente (según la antelación configurada).',
+  birthday:
+    'Lo encola el proceso diario, el día del mes configurado, para las clientas que cumplen años ese mes. Respeta a quienes pidieron no recibir marketing.',
+};
+
+export const CHANNEL_LABELS: Record<NotificationChannel, string> = {
+  email: 'Correo',
+  whatsapp: 'WhatsApp',
+};
+
+export const RECIPIENT_LABELS: Record<'client' | 'admin', string> = {
+  client: 'Para la clienta',
+  admin: 'Para Manu (interno)',
+};
+
+/** Valores de ejemplo para la vista previa del editor de plantillas. */
+export const PREVIEW_VARS: TemplateVars = {
+  cliente: 'María Fernanda',
+  servicio: 'Maquillaje social',
+  fecha: '15 ago 2026',
+  hora: '10:30',
+  negocio: 'Centro Estético Manuj',
+  telefono: '+57 321 548 7690',
+  telefono_cliente: '+57 300 123 4567',
+};

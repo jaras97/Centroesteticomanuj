@@ -41,7 +41,7 @@ export default function StepDetails({
 
   const form = useForm<StepDetailsInput>({
     resolver: zodResolver(stepDetailsSchema),
-    defaultValues: { name: '', phone: '', note: '', website: '' },
+    defaultValues: { name: '', phone: '', email: '', note: '', website: '' },
   });
 
   function onSubmit(values: StepDetailsInput) {
@@ -104,6 +104,30 @@ export default function StepDetails({
                 <FormControl>
                   <Input placeholder='+57 300 000 0000' {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='email'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Correo electrónico (opcional)</FormLabel>
+                <FormControl>
+                  <Input
+                    type='email'
+                    inputMode='email'
+                    autoComplete='email'
+                    placeholder='tucorreo@ejemplo.com'
+                    {...field}
+                  />
+                </FormControl>
+                <p className='text-xs text-gray-500'>
+                  Si nos lo dejas, te enviamos por correo la confirmación de tu solicitud y un
+                  recordatorio el día antes de tu cita. Nunca lo compartimos con nadie.
+                </p>
                 <FormMessage />
               </FormItem>
             )}

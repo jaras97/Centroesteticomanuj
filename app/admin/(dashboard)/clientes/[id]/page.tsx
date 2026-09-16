@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { Badge } from '@/components/ui/badge';
 import ClientEditForm from '@/components/admin/client-edit-form';
 import LoyaltyCard from '@/components/admin/loyalty-card';
+import NotificationOptOutToggle from '@/components/admin/notification-opt-out-toggle';
 import { formatBogotaHuman } from '@/lib/booking/timezone';
 import { getClientLoyaltyStatus } from '@/lib/booking/loyalty';
 import { formatCOP } from '@/lib/format';
@@ -115,6 +116,10 @@ export default async function ClientDetailPage({
             <ClientEditForm client={client as Client} />
           </div>
           <LoyaltyCard status={loyaltyStatus} />
+          <NotificationOptOutToggle
+            clientId={client.id}
+            optOut={(client as Client).marketing_opt_out ?? false}
+          />
         </div>
       </div>
     </div>
