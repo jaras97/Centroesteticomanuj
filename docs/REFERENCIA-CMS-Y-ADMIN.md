@@ -142,7 +142,7 @@ En los casos 2 y 3 **solo** se reescribe `service_id`: `duration_min`/`buffer_mi
 
 ## Supabase Storage
 
-Bucket único **`site-media`** (público, `unoptimized: true` en `next.config.mjs` así que Next no reprocesa las imágenes). RLS: lectura pública, escritura solo `authenticated`. Carpetas (por convención, no forzadas por el schema): `hero/`, `services/`, `gallery/`, `promos/`, `site/` (logo/favicon, fotos de la fundadora).
+Bucket **`site-media`** (uno por proyecto de Supabase — el de dev y el de producción son independientes, ver "Entornos" al final) (público, `unoptimized: true` en `next.config.mjs` así que Next no reprocesa las imágenes). RLS: lectura pública, escritura solo `authenticated`. Carpetas (por convención, no forzadas por el schema): `hero/`, `services/`, `gallery/`, `promos/`, `site/` (logo/favicon, fotos de la fundadora).
 
 Cloudinary está **completamente retirado** — no queda ninguna referencia en el código (se verificó con grep en el HANDOFF de la fase de theming). Todo el contenido histórico se migró con scripts puntuales (`scripts/migrate-cms-content.mjs` para el contenido inicial; los del logo/favicon fueron temporales y se borraron tras usarse).
 
@@ -207,7 +207,33 @@ Las secciones editoriales (`site_sections`) tienen además su **propio** `bg_col
 
 Todas aditivas desde la 0002 (no hacen `drop`). Se corren a mano en el SQL Editor de Supabase Studio — no hay CLI/CI conectado a este proyecto de Supabase desde este entorno de desarrollo (ver `docs/HANDOFF-cms-contenido-fase-1.md`, sección de por qué).
 
-## Estado de entornos
+## Entornos — **hay DOS proyectos de Supabase**
 
-- **Dev**: migraciones 0001-0012 corridas. **0013 y 0014 están escritas pero PENDIENTES de correr** — hasta que se corran, `/admin/clientes` y `/admin/notificaciones` muestran un aviso en pantalla explicando qué falta (degradan, no revientan), y el flujo público de reserva sigue funcionando igual, solo que sin encolar ninguna notificación. Contenido real cargado, contenido real cargado, Manu ya usando el CMS activamente (confirmado varias veces en esta sesión: promo con flyer propio, video en el carrusel).
-- **Producción**: no existe todavía. Todo el trabajo de esta sesión vive en la rama `preview`, sin mergear a `main`.
+Es el dato más importante de esta sección y el que más fácil se olvida: **desarrollo y producción son dos proyectos de Supabase separados**, con su propia base, su propio Auth y su propio Storage. No comparten nada.
+
+| | Proyecto | Apunta desde |
+|---|---|---|
+| Desarrollo | `rtmuaeonmqadbezygfrv` | `.env.local` (y por lo tanto `pnpm dev`) |
+| Producción | `rlpwmheokkrttxyfusyp` | variables de entorno de Vercel → `centroesteticomanuj.com` |
+
+Consecuencias prácticas, todas aprendidas a golpes:
+
+- **Cada migración hay que correrla DOS veces**, una en cada proyecto. Correrla solo en dev y probar en producción da errores que parecen bugs de código y no lo son (fue exactamente lo que pasó con `0013`: `/admin/clientes` mostraba "revisa que la migración se haya corrido" en producción mientras en dev funcionaba perfecto).
+- **El Storage es independiente.** Un archivo subido al bucket `site-media` de dev no existe en producción. Por eso ninguna migración debe sembrar una URL de Storage fija (ver el comentario de `0015`, que se corrigió justamente por esto).
+- **El contenido del CMS, los servicios y las clientas son independientes.** Lo que se carga en el panel queda en el proyecto por el que se entró.
+- Los usuarios de Supabase Auth también son distintos: la cuenta de admin de dev no sirve en producción.
+
+### Variables de entorno en Vercel
+
+`RESEND_API_KEY`, `RESEND_FROM` y `CRON_SECRET` están configuradas **solo en el entorno Production**. En los despliegues de Preview los correos quedan `OMITIDO` y `/api/cron/notificaciones` responde 401 — degrada como está diseñado, pero conviene saberlo antes de concluir que algo está roto. `NEXT_PUBLIC_SITE_URL` sí está en los tres entornos.
+
+`.env.local.example` es la referencia de qué hay que configurar. Está **explícitamente des-ignorado** en `.gitignore` (la regla `.env*` se lo comía y nunca se habría commiteado).
+
+### Cron de Vercel
+
+`vercel.json` registra un job diario, `0 13 * * *`. **El panel de Vercel muestra los horarios en UTC**, así que ahí se lee "At 01:00 PM" — son las **8:00 de la mañana en Bogotá**. En plan Hobby se ejecuta una vez al día en algún momento dentro de esa hora (no al minuto exacto) y hay un máximo de 2 jobs por proyecto; por eso un solo job hace las tres cosas.
+
+### Estado
+
+- **Dev** (`rtmuaeonmqadbezygfrv`): migraciones 0001-0015 corridas. Contenido real cargado, Manu usando el CMS activamente.
+- **Producción** (`rlpwmheokkrttxyfusyp`): desplegada en `centroesteticomanuj.com`, migraciones 0001-0015 corridas, notificaciones configuradas y verificadas con un envío real.
