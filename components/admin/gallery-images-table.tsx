@@ -1,14 +1,22 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useMemo, useTransition } from 'react';
 import Image from 'next/image';
-import { Reorder, useDragControls } from 'framer-motion';
+import { Reorder, useDragControls, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
-import { GripVertical, ImageIcon, Loader2 } from 'lucide-react';
+import { ImageIcon, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/admin/empty-state';
 import GalleryImageFormDialog from '@/components/admin/gallery-image-form-dialog';
+import ReorderHandle, {
+  ReorderAnnouncer,
+  reorderItemMotion,
+} from '@/components/admin/reorder-handle';
+import {
+  useKeyboardReorder,
+  type ReorderHandleProps,
+} from '@/lib/admin/use-keyboard-reorder';
 import {
   deleteGalleryImage,
   reorderGalleryImages,
@@ -17,8 +25,15 @@ import {
 import type { GalleryImage } from '@/lib/supabase/types';
 
 export default function GalleryImagesTable({ images: imagesProp }: { images: GalleryImage[] }) {
-  const [images, setImages] = useState(imagesProp);
-  useEffect(() => setImages(imagesProp), [imagesProp]);
+  const { items: images, setItems: setImages, getHandleProps, onDragEnd, announcer } =
+    useKeyboardReorder({
+      items: imagesProp,
+      // La imagen no tiene título: su categoría es lo único que la nombra en
+      // esta lista, y es lo que se anuncia al moverla.
+      getLabel: (image) => image.category,
+      itemNoun: 'la imagen',
+      persist: reorderGalleryImages,
+    });
 
   const existingCategories = useMemo(
     () => Array.from(new Set(images.map((i) => i.category))).sort(),
@@ -33,37 +48,38 @@ export default function GalleryImagesTable({ images: imagesProp }: { images: Gal
       />;
   }
 
-  function persistOrder(newOrder: GalleryImage[]) {
-    reorderGalleryImages(newOrder.map((i) => i.id)).then((result) => {
-      if (!result.ok) toast.error(result.error);
-    });
-  }
-
   return (
-    <Reorder.Group as='ul' axis='y' values={images} onReorder={setImages} className='space-y-2'>
-      {images.map((image) => (
-        <ImageRow
-          key={image.id}
-          image={image}
-          existingCategories={existingCategories}
-          onDragEnd={() => persistOrder(images)}
-        />
-      ))}
-    </Reorder.Group>
+    <>
+      <ReorderAnnouncer {...announcer} />
+      <Reorder.Group as='ul' axis='y' values={images} onReorder={setImages} className='space-y-2'>
+        {images.map((image, index) => (
+          <ImageRow
+            key={image.id}
+            image={image}
+            existingCategories={existingCategories}
+            handle={getHandleProps(image, index)}
+            onDragEnd={onDragEnd}
+          />
+        ))}
+      </Reorder.Group>
+    </>
   );
 }
 
 function ImageRow({
   image,
   existingCategories,
+  handle,
   onDragEnd,
 }: {
   image: GalleryImage;
   existingCategories: string[];
+  handle: ReorderHandleProps;
   onDragEnd: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const dragControls = useDragControls();
+  const reduceMotion = useReducedMotion();
 
   function toggleActive() {
     startTransition(async () => {
@@ -87,17 +103,10 @@ function ImageRow({
       dragControls={dragControls}
       onDragEnd={onDragEnd}
       className='flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border bg-white p-3 shadow-sm'
-      whileDrag={{ boxShadow: '0 8px 20px rgba(0,0,0,0.12)', scale: 1.01 }}
+      {...reorderItemMotion(reduceMotion)}
     >
       <div className='flex items-center gap-3 min-w-0 w-full sm:w-auto'>
-        <button
-          type='button'
-          onPointerDown={(e) => dragControls.start(e)}
-          className='shrink-0 cursor-grab touch-none text-gray-300 hover:text-gray-500 active:cursor-grabbing'
-          aria-label='Arrastrar para reordenar'
-        >
-          <GripVertical className='h-5 w-5' />
-        </button>
+        <ReorderHandle dragControls={dragControls} {...handle} />
 
         <div className='relative h-14 w-14 shrink-0 rounded overflow-hidden bg-gray-100'>
           <Image src={image.image_url} alt='' fill className='object-cover' draggable={false} />

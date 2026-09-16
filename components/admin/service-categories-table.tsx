@@ -1,14 +1,22 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import Image from 'next/image';
-import { Reorder, useDragControls } from 'framer-motion';
+import { Reorder, useDragControls, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
-import { GripVertical, Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/admin/empty-state';
 import ServiceCategoryFormDialog from '@/components/admin/service-category-form-dialog';
+import ReorderHandle, {
+  ReorderAnnouncer,
+  reorderItemMotion,
+} from '@/components/admin/reorder-handle';
+import {
+  useKeyboardReorder,
+  type ReorderHandleProps,
+} from '@/lib/admin/use-keyboard-reorder';
 import {
   deleteServiceCategory,
   reorderServiceCategories,
@@ -21,8 +29,13 @@ export default function ServiceCategoriesTable({
 }: {
   categories: ServiceCategory[];
 }) {
-  const [categories, setCategories] = useState(categoriesProp);
-  useEffect(() => setCategories(categoriesProp), [categoriesProp]);
+  const { items: categories, setItems: setCategories, getHandleProps, onDragEnd, announcer } =
+    useKeyboardReorder({
+      items: categoriesProp,
+      getLabel: (category) => category.name,
+      itemNoun: 'la categoría',
+      persist: reorderServiceCategories,
+    });
 
   if (categories.length === 0) {
     return <EmptyState
@@ -32,40 +45,41 @@ export default function ServiceCategoriesTable({
       />;
   }
 
-  function persistOrder(newOrder: ServiceCategory[]) {
-    reorderServiceCategories(newOrder.map((c) => c.id)).then((result) => {
-      if (!result.ok) toast.error(result.error);
-    });
-  }
-
   return (
-    <Reorder.Group
-      as='ul'
-      axis='y'
-      values={categories}
-      onReorder={setCategories}
-      className='space-y-2'
-    >
-      {categories.map((category) => (
-        <CategoryRow
-          key={category.id}
-          category={category}
-          onDragEnd={() => persistOrder(categories)}
-        />
-      ))}
-    </Reorder.Group>
+    <>
+      <ReorderAnnouncer {...announcer} />
+      <Reorder.Group
+        as='ul'
+        axis='y'
+        values={categories}
+        onReorder={setCategories}
+        className='space-y-2'
+      >
+        {categories.map((category, index) => (
+          <CategoryRow
+            key={category.id}
+            category={category}
+            handle={getHandleProps(category, index)}
+            onDragEnd={onDragEnd}
+          />
+        ))}
+      </Reorder.Group>
+    </>
   );
 }
 
 function CategoryRow({
   category,
+  handle,
   onDragEnd,
 }: {
   category: ServiceCategory;
+  handle: ReorderHandleProps;
   onDragEnd: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const dragControls = useDragControls();
+  const reduceMotion = useReducedMotion();
 
   function toggleActive() {
     startTransition(async () => {
@@ -89,17 +103,10 @@ function CategoryRow({
       dragControls={dragControls}
       onDragEnd={onDragEnd}
       className='flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border bg-white p-3 shadow-sm'
-      whileDrag={{ boxShadow: '0 8px 20px rgba(0,0,0,0.12)', scale: 1.01 }}
+      {...reorderItemMotion(reduceMotion)}
     >
       <div className='flex items-center gap-3 min-w-0 w-full sm:w-auto'>
-        <button
-          type='button'
-          onPointerDown={(e) => dragControls.start(e)}
-          className='shrink-0 cursor-grab touch-none text-gray-300 hover:text-gray-500 active:cursor-grabbing'
-          aria-label='Arrastrar para reordenar'
-        >
-          <GripVertical className='h-5 w-5' />
-        </button>
+        <ReorderHandle dragControls={dragControls} {...handle} />
 
         <div className='relative h-12 w-16 shrink-0 rounded overflow-hidden bg-gray-100'>
           <Image src={category.image_url} alt='' fill className='object-cover' draggable={false} />

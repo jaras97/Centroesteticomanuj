@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import Image from 'next/image';
-import { Reorder, useDragControls } from 'framer-motion';
+import { Reorder, useDragControls, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
   Compass,
-  GripVertical,
   ImageIcon,
   Loader2,
   Rows3,
@@ -17,6 +16,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/admin/empty-state';
+import ReorderHandle, {
+  ReorderAnnouncer,
+  reorderItemMotion,
+} from '@/components/admin/reorder-handle';
+import {
+  useKeyboardReorder,
+  type ReorderHandleProps,
+} from '@/lib/admin/use-keyboard-reorder';
 import SiteSectionFormDialog from '@/components/admin/site-section-form-dialog';
 import {
   deleteSiteSection,
@@ -43,8 +50,17 @@ const MARKER_HINTS: Record<Exclude<SiteSectionKind, 'editorial'>, string> = {
 };
 
 export default function SiteSectionsTable({ sections: sectionsProp }: { sections: SiteSection[] }) {
-  const [sections, setSections] = useState(sectionsProp);
-  useEffect(() => setSections(sectionsProp), [sectionsProp]);
+  // Orden optimista + teclado + anuncio, compartido con las otras listas
+  // ordenables (ver `lib/admin/use-keyboard-reorder.ts`). Las filas marcador
+  // ('services'/'about'/'mission_vision'/'gallery') no se pueden crear ni
+  // eliminar, pero SÍ se reordenan: llevan handle igual que las editoriales.
+  const { items: sections, setItems: setSections, getHandleProps, onDragEnd, announcer } =
+    useKeyboardReorder({
+      items: sectionsProp,
+      getLabel: (section) => section.title,
+      itemNoun: 'la sección',
+      persist: reorderSiteSections,
+    });
 
   if (sections.length === 0) {
     return <EmptyState
@@ -54,24 +70,35 @@ export default function SiteSectionsTable({ sections: sectionsProp }: { sections
       />;
   }
 
-  function persistOrder(newOrder: SiteSection[]) {
-    reorderSiteSections(newOrder.map((s) => s.id)).then((result) => {
-      if (!result.ok) toast.error(result.error);
-    });
-  }
-
   return (
-    <Reorder.Group as='ul' axis='y' values={sections} onReorder={setSections} className='space-y-2'>
-      {sections.map((section) => (
-        <SectionRow key={section.id} section={section} onDragEnd={() => persistOrder(sections)} />
-      ))}
-    </Reorder.Group>
+    <>
+      <ReorderAnnouncer {...announcer} />
+      <Reorder.Group as='ul' axis='y' values={sections} onReorder={setSections} className='space-y-2'>
+        {sections.map((section, index) => (
+          <SectionRow
+            key={section.id}
+            section={section}
+            handle={getHandleProps(section, index)}
+            onDragEnd={onDragEnd}
+          />
+        ))}
+      </Reorder.Group>
+    </>
   );
 }
 
-function SectionRow({ section, onDragEnd }: { section: SiteSection; onDragEnd: () => void }) {
+function SectionRow({
+  section,
+  handle,
+  onDragEnd,
+}: {
+  section: SiteSection;
+  handle: ReorderHandleProps;
+  onDragEnd: () => void;
+}) {
   const [isPending, startTransition] = useTransition();
   const dragControls = useDragControls();
+  const reduceMotion = useReducedMotion();
   const markerKind = section.kind !== 'editorial' ? section.kind : null;
   const isMarker = markerKind !== null;
 
@@ -99,17 +126,10 @@ function SectionRow({ section, onDragEnd }: { section: SiteSection; onDragEnd: (
       dragControls={dragControls}
       onDragEnd={onDragEnd}
       className='flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border bg-white p-3 shadow-sm'
-      whileDrag={{ boxShadow: '0 8px 20px rgba(0,0,0,0.12)', scale: 1.01 }}
+      {...reorderItemMotion(reduceMotion)}
     >
       <div className='flex items-center gap-3 min-w-0 w-full sm:w-auto'>
-        <button
-          type='button'
-          onPointerDown={(e) => dragControls.start(e)}
-          className='shrink-0 cursor-grab touch-none text-gray-300 hover:text-gray-500 active:cursor-grabbing'
-          aria-label='Arrastrar para reordenar'
-        >
-          <GripVertical className='h-5 w-5' />
-        </button>
+        <ReorderHandle dragControls={dragControls} {...handle} />
 
         <div className='relative h-12 w-20 shrink-0 rounded overflow-hidden bg-gray-100 flex items-center justify-center'>
           {MarkerIcon ? (
@@ -134,7 +154,7 @@ function SectionRow({ section, onDragEnd }: { section: SiteSection; onDragEnd: (
             )}
           </div>
           {isMarker && (
-            <p className='text-xs text-gray-400 truncate'>{markerKind && MARKER_HINTS[markerKind]}</p>
+            <p className='text-xs text-gray-500 truncate'>{markerKind && MARKER_HINTS[markerKind]}</p>
           )}
         </div>
 
