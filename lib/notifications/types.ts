@@ -69,6 +69,8 @@ export interface NotificationSettings {
   admin_email: string | null;
   admin_whatsapp: string | null;
   business_name: string;
+  /** Logo PNG/JPG para la cabecera de los correos. Ver `buildEmailHtml`. */
+  email_logo_url: string | null;
   reminder_hours_before: number;
   birthday_send_day: number;
   updated_at: string;

@@ -79,8 +79,26 @@ export function buildEmailHtml(options: {
   businessName: string;
   /** Línea extra al pie (p. ej. la nota de baja del correo de cumpleaños). */
   footerNote?: string;
+  /**
+   * Logo de la cabecera. Tiene que ser PNG o JPG: **ningún cliente de correo
+   * mayoritario renderiza SVG** (Gmail y Outlook lo bloquean), así que NO
+   * sirve el `site_settings.logo_url` del sitio, que es un SVG. Por eso es un
+   * campo aparte (`notification_settings.email_logo_url`) y no el del sitio.
+   * Si viene vacío, la cabecera cae al nombre del negocio en texto.
+   */
+  logoUrl?: string | null;
 }): string {
-  const { bodyHtml, businessName, footerNote } = options;
+  const { bodyHtml, businessName, footerNote, logoUrl } = options;
+
+  // El `alt` no es decorativo: muchos clientes bloquean las imágenes por
+  // defecto y esa línea es lo único que se ve hasta que la clienta las
+  // habilita. Va estilada para que se lea como el título que reemplaza.
+  const header = logoUrl
+    ? `<img src="${escapeHtml(logoUrl)}" width="60" height="60" alt="${escapeHtml(businessName)}"
+                   style="display:block;border:0;outline:none;text-decoration:none;width:60px;height:auto;color:${EMAIL_SAND};font-family:Georgia,'Times New Roman',serif;font-size:18px;font-style:italic;" />`
+    : `<p style="margin:0;color:${EMAIL_SAND};font-family:Georgia,'Times New Roman',serif;font-size:20px;font-style:italic;letter-spacing:0.5px;">
+                ${escapeHtml(businessName)}
+              </p>`;
   return `<!doctype html>
 <html lang="es">
 <head>
@@ -95,9 +113,7 @@ export function buildEmailHtml(options: {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#FFFFFF;border-radius:12px;overflow:hidden;">
           <tr>
             <td style="background-color:${EMAIL_INK};padding:24px 28px;">
-              <p style="margin:0;color:${EMAIL_SAND};font-family:Georgia,'Times New Roman',serif;font-size:20px;font-style:italic;letter-spacing:0.5px;">
-                ${escapeHtml(businessName)}
-              </p>
+              ${header}
             </td>
           </tr>
           <tr>
@@ -142,7 +158,7 @@ export function buildUnsubscribeNote(contact: string): string {
 export function renderTemplate(
   template: Pick<NotificationTemplate, 'event' | 'channel' | 'subject' | 'body'>,
   vars: TemplateVars,
-  options?: { businessName?: string; footerNote?: string },
+  options?: { businessName?: string; footerNote?: string; logoUrl?: string | null },
 ): RenderedMessage {
   const text = interpolate(template.body, vars, (v) => v);
 
@@ -163,6 +179,7 @@ export function renderTemplate(
     bodyHtml: textToHtmlParagraphs(escapedBody),
     businessName: options?.businessName ?? vars.negocio ?? 'Centro Estético Manuj',
     footerNote: options?.footerNote,
+    logoUrl: options?.logoUrl,
   });
 
   return { subject, body, text };

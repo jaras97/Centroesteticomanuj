@@ -35,9 +35,12 @@ const EVENT_ORDER: NotificationEvent[] = [
 export default function NotificationTemplatesEditor({
   templates,
   emailConfigured,
+  emailLogoUrl,
 }: {
   templates: NotificationTemplate[];
   emailConfigured: boolean;
+  /** Logo de la cabecera, para que la vista previa muestre lo mismo que se envía. */
+  emailLogoUrl: string | null;
 }) {
   const [selectedId, setSelectedId] = useState(templates[0]?.id ?? null);
   const selected = templates.find((t) => t.id === selectedId) ?? null;
@@ -109,6 +112,7 @@ export default function NotificationTemplatesEditor({
           key={selected.id}
           template={selected}
           emailConfigured={emailConfigured}
+          emailLogoUrl={emailLogoUrl}
         />
       )}
     </div>
@@ -118,9 +122,11 @@ export default function NotificationTemplatesEditor({
 function TemplateForm({
   template,
   emailConfigured,
+  emailLogoUrl,
 }: {
   template: NotificationTemplate;
   emailConfigured: boolean;
+  emailLogoUrl: string | null;
 }) {
   const [subject, setSubject] = useState(template.subject ?? '');
   const [body, setBody] = useState(template.body);
@@ -138,9 +144,9 @@ function TemplateForm({
       renderTemplate(
         { event: template.event, channel: template.channel, subject, body },
         PREVIEW_VARS,
-        { businessName: PREVIEW_VARS.negocio },
+        { businessName: PREVIEW_VARS.negocio, logoUrl: emailLogoUrl },
       ),
-    [template.event, template.channel, subject, body],
+    [template.event, template.channel, subject, body, emailLogoUrl],
   );
 
   /** Inserta la variable donde está el cursor (o al final si no hay foco). */

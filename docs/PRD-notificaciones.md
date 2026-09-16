@@ -321,6 +321,32 @@ Si algo falla, el mensaje de error dice qué: falta una variable, Resend rechaz�
 
 ---
 
+## 10.bis Logo en la cabecera de los correos
+
+`notification_settings.email_logo_url` (migración 0015) es la imagen que se
+muestra arriba del correo. Editable desde `/admin/notificaciones` → Ajustes
+generales. Si queda vacío, la cabecera cae al nombre del negocio en texto.
+
+**Tiene que ser PNG o JPG, nunca SVG.** No es una preferencia: Gmail y Outlook
+—los dos clientes que más van a abrir estos correos— bloquean o ignoran los
+`<img>` que apuntan a un SVG; solo Apple Mail lo renderiza. Por eso **no** se
+reusa `site_settings.logo_url`, que es el SVG del sitio: son dos assets con
+formatos distintos, no el mismo dato. La Server Action `updateNotificationSettings`
+rechaza explícitamente una URL terminada en `.svg` para que no se configure un
+logo que en la práctica nadie vería.
+
+El PNG actual (`site-media/site/logo-email.png`, 240×242) se generó a partir del
+SVG del sitio con `sharp` a densidad 300 y se muestra a 60px de ancho. Para
+cambiarlo: subir el archivo nuevo al bucket `site-media` y pegar su URL pública
+en el campo del panel.
+
+El atributo `alt` de la imagen lleva el nombre del negocio y va estilado con la
+tipografía y el color de la cabecera, no por accesibilidad nada más: muchos
+clientes bloquean las imágenes por defecto, y esa línea es lo único que se ve
+hasta que la destinataria las habilita.
+
+---
+
 ## 11. Limitaciones conocidas
 
 - **El recordatorio se manda a la hora del cron, no con la antelación exacta.** Con un job diario, `reminder_hours_before` define cuántos días antes se avisa (24 → el día anterior), no la hora. Para respetar la hora exacta haría falta un cron horario, que el plan Hobby no permite.
