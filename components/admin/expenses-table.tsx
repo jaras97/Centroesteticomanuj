@@ -21,7 +21,11 @@ import type { Expense } from '@/lib/supabase/types';
 
 export default function ExpensesTable({ expenses }: { expenses: Expense[] }) {
   if (expenses.length === 0) {
-    return <EmptyState icon={Receipt} message='No hay gastos registrados en este período.' />;
+    return <EmptyState
+        icon={Receipt}
+        message='No hay gastos registrados en este período.'
+        hint='Usa el botón "Nuevo gasto" para registrar compras de insumos o pagos del mes.'
+      />;
   }
 
   return (

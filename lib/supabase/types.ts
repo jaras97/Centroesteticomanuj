@@ -28,6 +28,9 @@ export interface Client {
   email: string | null;
   birthday: string | null;
   notes: string | null;
+  /** Si es true, no recibe correos de marketing (el saludo de cumpleaños).
+   * Los avisos transaccionales (solicitud, recordatorio) no dependen de esto. */
+  marketing_opt_out: boolean;
   created_at: string;
   updated_at: string;
 }

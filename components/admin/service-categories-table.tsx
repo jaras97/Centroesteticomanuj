@@ -25,7 +25,11 @@ export default function ServiceCategoriesTable({
   useEffect(() => setCategories(categoriesProp), [categoriesProp]);
 
   if (categories.length === 0) {
-    return <EmptyState icon={Sparkles} message='Todavía no hay categorías de servicio.' />;
+    return <EmptyState
+        icon={Sparkles}
+        message='Todavía no hay categorías de servicio.'
+        hint='Usa el botón "Nueva categoría" para llenar la sección de servicios del sitio.'
+      />;
   }
 
   function persistOrder(newOrder: ServiceCategory[]) {

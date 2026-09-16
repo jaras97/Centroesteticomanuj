@@ -47,7 +47,11 @@ export default function SiteSectionsTable({ sections: sectionsProp }: { sections
   useEffect(() => setSections(sectionsProp), [sectionsProp]);
 
   if (sections.length === 0) {
-    return <EmptyState icon={Rows3} message='Todavía no hay secciones.' />;
+    return <EmptyState
+        icon={Rows3}
+        message='Todavía no hay secciones.'
+        hint='Usa el botón "Nueva sección" para agregar bloques a la página de inicio.'
+      />;
   }
 
   function persistOrder(newOrder: SiteSection[]) {

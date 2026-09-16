@@ -27,7 +27,11 @@ export default function ServicesTable({
   categories: ServiceCategory[];
 }) {
   if (services.length === 0) {
-    return <EmptyState icon={Tag} message='Todavía no hay servicios registrados.' />;
+    return <EmptyState
+        icon={Tag}
+        message='Todavía no hay servicios registrados.'
+        hint='Usa el botón "Nuevo servicio" para que aparezcan como opción al reservar.'
+      />;
   }
 
   return (

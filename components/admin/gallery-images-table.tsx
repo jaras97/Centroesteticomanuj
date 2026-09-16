@@ -26,7 +26,11 @@ export default function GalleryImagesTable({ images: imagesProp }: { images: Gal
   );
 
   if (images.length === 0) {
-    return <EmptyState icon={ImageIcon} message='Todavía no hay imágenes en la galería.' />;
+    return <EmptyState
+        icon={ImageIcon}
+        message='Todavía no hay imágenes en la galería.'
+        hint='Usa el botón "Nueva imagen" para publicar los primeros trabajos.'
+      />;
   }
 
   function persistOrder(newOrder: GalleryImage[]) {

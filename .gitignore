@@ -18,6 +18,9 @@ yarn-error.log*
 
 # env files
 .env*
+# ...salvo la plantilla de variables, que SÍ va versionada: es la única
+# referencia de qué hay que configurar al desplegar (ver docs/PRD-notificaciones.md).
+!.env.local.example
 
 # vercel
 .vercel

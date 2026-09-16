@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  Bell,
   CalendarDays,
   CalendarPlus,
   Clock,
@@ -26,6 +27,7 @@ const LINKS = [
   { href: '/admin/finanzas', label: 'Finanzas', icon: Wallet },
   { href: '/admin/clientes', label: 'Clientes', icon: Users },
   { href: '/admin/contenido', label: 'Contenido', icon: ImageIcon },
+  { href: '/admin/notificaciones', label: 'Notificaciones', icon: Bell },
 ];
 
 export default function AdminNav({ email }: { email: string }) {

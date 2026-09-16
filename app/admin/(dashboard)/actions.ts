@@ -4,6 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { evaluateAndGrantLoyaltyReward, getAvailableRewards as getAvailableRewardsForClient } from '@/lib/booking/loyalty';
 import { bogotaWallTimeToUtc } from '@/lib/booking/timezone';
+import { dispatchQuietly } from '@/lib/notifications/dispatch';
+import { emailConfigurationIssue, sendRawEmail } from '@/lib/notifications/channels/email';
+import { PREVIEW_VARS, renderTemplate } from '@/lib/notifications/templates';
 
 async function requireUser() {
   const supabase = await createClient();
@@ -1458,4 +1461,219 @@ export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath('/admin', 'layout');
+}
+
+// ---------------------------------------------------------------------------
+// Notificaciones (/admin/notificaciones)
+// ---------------------------------------------------------------------------
+
+function revalidateNotificaciones() {
+  revalidatePath('/admin/notificaciones');
+}
+
+export async function updateNotificationTemplate(
+  id: string,
+  input: { subject: string | null; body: string },
+) {
+  const supabase = await requireUser();
+
+  if (!input.body.trim()) {
+    return { ok: false, error: 'El mensaje no puede quedar vacío.' };
+  }
+
+  const { error } = await supabase
+    .from('notification_templates')
+    .update({
+      subject: input.subject?.trim() || null,
+      body: input.body.trim(),
+    })
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo guardar la plantilla.' };
+
+  revalidateNotificaciones();
+  return { ok: true };
+}
+
+export async function setNotificationTemplateEnabled(id: string, enabled: boolean) {
+  const supabase = await requireUser();
+
+  const { error } = await supabase
+    .from('notification_templates')
+    .update({ enabled })
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar la plantilla.' };
+
+  revalidateNotificaciones();
+  return { ok: true };
+}
+
+export async function updateNotificationSettings(input: {
+  adminEmail: string;
+  adminWhatsapp: string;
+  businessName: string;
+  reminderHoursBefore: number;
+  birthdaySendDay: number;
+}) {
+  const supabase = await requireUser();
+
+  if (!input.businessName.trim()) {
+    return { ok: false, error: 'El nombre del centro es obligatorio.' };
+  }
+  if (input.adminEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.adminEmail.trim())) {
+    return { ok: false, error: 'El correo de avisos no es válido.' };
+  }
+  if (input.reminderHoursBefore < 1 || input.reminderHoursBefore > 168) {
+    return { ok: false, error: 'La antelación debe estar entre 1 y 168 horas.' };
+  }
+  if (input.birthdaySendDay < 1 || input.birthdaySendDay > 28) {
+    return { ok: false, error: 'El día de envío debe estar entre 1 y 28.' };
+  }
+
+  const { error } = await supabase
+    .from('notification_settings')
+    .update({
+      admin_email: input.adminEmail.trim() || null,
+      admin_whatsapp: input.adminWhatsapp.trim() || null,
+      business_name: input.businessName.trim(),
+      reminder_hours_before: input.reminderHoursBefore,
+      birthday_send_day: input.birthdaySendDay,
+    })
+    .eq('id', true);
+
+  if (error) return { ok: false, error: 'No se pudo guardar la configuración.' };
+
+  revalidateNotificaciones();
+  return { ok: true };
+}
+
+/**
+ * Bandeja asistida de WhatsApp: Manu abre el link wa.me, manda el mensaje y
+ * marca la notificación acá. No hay forma de confirmarlo automáticamente
+ * mientras no exista la integración con la Cloud API — por eso es manual.
+ */
+export async function markWhatsAppNotificationSent(id: string) {
+  const supabase = await requireUser();
+
+  const { error } = await supabase
+    .from('notifications')
+    .update({ status: 'ENVIADO', sent_at: new Date().toISOString(), error: null })
+    .eq('id', id)
+    .eq('channel', 'whatsapp');
+
+  if (error) return { ok: false, error: 'No se pudo marcar como enviado.' };
+
+  revalidateNotificaciones();
+  return { ok: true };
+}
+
+/** Descarta una notificación de WhatsApp pendiente sin enviarla. */
+export async function skipWhatsAppNotification(id: string) {
+  const supabase = await requireUser();
+
+  const { error } = await supabase
+    .from('notifications')
+    .update({ status: 'OMITIDO', error: 'Descartada manualmente desde el panel.' })
+    .eq('id', id)
+    .eq('channel', 'whatsapp');
+
+  if (error) return { ok: false, error: 'No se pudo descartar el mensaje.' };
+
+  revalidateNotificaciones();
+  return { ok: true };
+}
+
+/** Vuelve a poner una notificación FALLIDO/OMITIDO en la cola y la despacha. */
+export async function retryNotification(id: string) {
+  const supabase = await requireUser();
+
+  const { error } = await supabase
+    .from('notifications')
+    .update({
+      status: 'PENDIENTE',
+      scheduled_for: new Date().toISOString(),
+      error: null,
+    })
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo reintentar el envío.' };
+
+  await dispatchQuietly(supabase);
+
+  revalidateNotificaciones();
+  return { ok: true };
+}
+
+/**
+ * Manda un correo de prueba con la plantilla elegida y valores de ejemplo.
+ * Es la única forma de verificar que Resend y el dominio están bien
+ * configurados sin tener que reservar una cita de mentiras.
+ */
+export async function sendTestNotificationEmail(templateId: string, toOverride?: string) {
+  const supabase = await requireUser();
+
+  const configIssue = emailConfigurationIssue();
+  if (configIssue) return { ok: false, error: configIssue };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: template } = await supabase
+    .from('notification_templates')
+    .select('*')
+    .eq('id', templateId)
+    .maybeSingle();
+
+  if (!template) return { ok: false, error: 'No se encontró la plantilla.' };
+  if (template.channel !== 'email') {
+    return { ok: false, error: 'Solo se pueden probar las plantillas de correo.' };
+  }
+
+  const { data: settings } = await supabase
+    .from('notification_settings')
+    .select('admin_email, business_name')
+    .eq('id', true)
+    .maybeSingle();
+
+  const to = toOverride?.trim() || settings?.admin_email || user?.email;
+  if (!to) {
+    return {
+      ok: false,
+      error: 'No hay a dónde mandar la prueba: configura el correo de avisos.',
+    };
+  }
+
+  const businessName = settings?.business_name || 'Centro Estético Manuj';
+  const rendered = renderTemplate(template, PREVIEW_VARS, { businessName });
+
+  const result = await sendRawEmail({
+    to,
+    subject: `[PRUEBA] ${rendered.subject ?? businessName}`,
+    html: rendered.body,
+    text: rendered.text,
+  });
+
+  if ('skipped' in result) return { ok: false, error: result.reason };
+  if ('deferred' in result) return { ok: false, error: 'El canal no envía automáticamente.' };
+  if (!result.ok) return { ok: false, error: `Resend rechazó el envío: ${result.error}` };
+
+  return { ok: true, sentTo: to };
+}
+
+/** Permite marcar/desmarcar a una clienta como "no quiero correos de marketing". */
+export async function setClientMarketingOptOut(clientId: string, optOut: boolean) {
+  const supabase = await requireUser();
+
+  const { error } = await supabase
+    .from('clients')
+    .update({ marketing_opt_out: optOut })
+    .eq('id', clientId);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar la preferencia.' };
+
+  revalidatePath('/admin/clientes');
+  revalidatePath(`/admin/clientes/${clientId}`);
+  return { ok: true };
 }

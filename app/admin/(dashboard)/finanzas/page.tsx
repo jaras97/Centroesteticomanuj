@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import SummaryCard from '@/components/admin/summary-card';
+import StaggerIn from '@/components/admin/stagger-in';
 import ExpensesTable from '@/components/admin/expenses-table';
 import ExpenseFormDialog from '@/components/admin/expense-form-dialog';
 import RevenueChart, { type DailyRevenuePoint } from '@/components/admin/revenue-chart';
@@ -215,14 +216,14 @@ export default async function FinanzasPage({
         </TabsList>
 
         <TabsContent value='resumen'>
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
+          <StaggerIn className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
             <SummaryCard icon={DollarSign} label='Ingresos de hoy' value={formatCOP(todayRevenue)} />
             <SummaryCard icon={TrendingUp} label='Ingresos del mes' value={formatCOP(totalRevenue)} />
             <SummaryCard icon={TrendingDown} label='Gastos del mes' value={formatCOP(totalExpenses)} />
             <SummaryCard icon={Wallet} label='Utilidad neta' value={formatCOP(netProfit)} />
-          </div>
+          </StaggerIn>
 
-          <div className='grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6'>
+          <StaggerIn className='grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6'>
             <SummaryCard icon={DollarSign} label='Ticket promedio' value={formatCOP(averageTicket)} />
             <SummaryCard icon={TrendingDown} label='No-show / cancelación' value={`${noShowRate}%`} />
             <SummaryCard
@@ -230,7 +231,7 @@ export default async function FinanzasPage({
               label='Clientes nuevos vs recurrentes'
               value={`${newClients} / ${recurringClients}`}
             />
-          </div>
+          </StaggerIn>
 
           <Card className='mb-6'>
             <CardHeader>

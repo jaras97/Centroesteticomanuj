@@ -78,6 +78,11 @@ export default function GallerySection({ images }: { images: GalleryImage[] }) {
     [filteredImages],
   );
 
+  const openLightbox = (id: string) => {
+    const found = filteredImages.findIndex((i) => i.id === id);
+    setLightboxIndex(found === -1 ? 0 : found);
+  };
+
   if (images.length === 0) return null;
 
   return (
@@ -113,7 +118,8 @@ export default function GallerySection({ images }: { images: GalleryImage[] }) {
                     setSelectedCategory(c);
                     setLightboxIndex(null);
                   }}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                  aria-pressed={active}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal focus-visible:ring-offset-2 ${
                     active
                       ? 'bg-brand-teal text-white shadow-lg'
                       : 'bg-white text-gray-600 hover:bg-brand-sand/20 hover:text-brand-ink'
@@ -133,6 +139,8 @@ export default function GallerySection({ images }: { images: GalleryImage[] }) {
         >
           <AnimatePresence mode='popLayout'>
             {filteredImages.map((image, idx) => (
+              // La tarjeta abre el lightbox: sin role/tabIndex/teclado era
+              // inalcanzable para quien navega sin mouse.
               <motion.div
                 key={image.id}
                 // cada card controla su entrada cuando entra en viewport
@@ -143,12 +151,16 @@ export default function GallerySection({ images }: { images: GalleryImage[] }) {
                 viewport={{ once: true, amount: 0.3 }} // anima cuando la card es visible
                 whileHover={{ y: -4 }}
                 transition={{ duration: 0.3, ease: EASE_OUT }}
-                className='group relative aspect-square overflow-hidden rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300'
-                onClick={() => {
-                  const found = filteredImages.findIndex(
-                    (i) => i.id === image.id,
-                  );
-                  setLightboxIndex(found === -1 ? 0 : found);
+                className='group relative aspect-square overflow-hidden rounded-2xl cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal focus-visible:ring-offset-2'
+                role='button'
+                tabIndex={0}
+                aria-label={`Ampliar imagen: ${image.alt_text}`}
+                onClick={() => openLightbox(image.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openLightbox(image.id);
+                  }
                 }}
               >
                 <Image
