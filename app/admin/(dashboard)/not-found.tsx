@@ -17,12 +17,12 @@ export default function AdminNotFound() {
       <p className='text-sm text-gray-500 mb-6'>
         El registro que buscas no existe o fue eliminado.
       </p>
-      <Link href='/admin'>
-        <Button variant='outline'>
+      <Button asChild variant='outline'>
+        <Link href='/admin'>
           <Inbox className='h-4 w-4' />
           Ir a la bandeja
-        </Button>
-      </Link>
+        </Link>
+      </Button>
     </div>
   );
 }
