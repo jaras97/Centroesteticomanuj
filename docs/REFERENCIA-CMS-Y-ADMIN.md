@@ -29,9 +29,15 @@ Un solo admin autenticado (Supabase Auth, sin roles) tiene acceso total a ambos 
 | `/admin/horarios` | Plantilla semanal de disponibilidad + bloqueos puntuales |
 | `/admin/servicios` | Catálogo de servicios agendables (duración/precio/anticipo/categoría de marketing) |
 | `/admin/finanzas` | Resumen de ingresos/gastos, gastos |
-| `/admin/clientes` | Listado y ficha de cliente (historial, fidelización) |
+| `/admin/clientes` | Listado (buscador + paginación de 25) y ficha de cliente (historial, fidelización, preferencia de marketing) |
 | `/admin/contenido` | **CMS** — 6 pestañas: Carrusel, Servicios (categorías), Galería, Promociones, Secciones, Sitio |
+| `/admin/notificaciones` | **Notificaciones** — 3 pestañas: Plantillas (+ configuración), Pendientes de WhatsApp, Historial. Ver `docs/PRD-notificaciones.md` |
 | `/admin/login` | Login (Supabase Auth email/password) |
+
+### API HTTP (única excepción al patrón de Server Actions)
+| Ruta | Qué es |
+|---|---|
+| `/api/cron/notificaciones` | Proceso diario del módulo de notificaciones: encola recordatorios, encola cumpleaños y despacha el outbox. `GET` y `POST`. **No** pasa por `middleware.ts` (que solo matchea `/admin/:path*`): se autentica sola. Si `CRON_SECRET` está configurado exige `Authorization: Bearer $CRON_SECRET`; si no, acepta la cabecera `x-vercel-cron`. Registrada en `vercel.json` (`0 13 * * *` UTC = 08:00 Bogotá) |
 
 ## Modelo de datos
 
@@ -61,8 +67,31 @@ Un solo admin autenticado (Supabase Auth, sin roles) tiene acceso total a ambos 
 
 Columnas: `id, kind, title, body, media_type ('image'|'video'|'color'), image_url, video_url, bg_color, text_color, text_align ('left'|'center'|'right'), cta_label, cta_href, display_order, active, created_at, updated_at`.
 
+### Notificaciones (migración 0014 — ver `docs/PRD-notificaciones.md`)
+
+**`notifications`** — el **outbox**. Nada se envía directo desde una Server Action: se encola una fila acá y un worker (`lib/notifications/dispatch.ts`) la despacha.
+`id, event ('booking_requested'|'appointment_reminder'|'birthday'), channel ('email'|'whatsapp'), recipient_kind ('client'|'admin'), to_email, to_phone, client_id (FK null), appointment_id (FK null), subject, body (ya renderizado), status ('PENDIENTE'|'ENVIANDO'|'ENVIADO'|'FALLIDO'|'OMITIDO'), attempts, scheduled_for, sent_at, error, dedupe_key, created_at, updated_at`.
+`dedupe_key` con **`unique index`** es la idempotencia del encolado (`on conflict do nothing`); `ENVIANDO` es el claim atómico que impide que dos despachos simultáneos manden el mismo correo dos veces.
+
+**`notification_templates`** — plantillas editables desde el panel, una por `(event, channel, recipient_kind)` (unique).
+`id, event, channel, recipient_kind, subject (solo correo), body, enabled, created_at, updated_at`. El cuerpo admite `{{cliente}}`, `{{servicio}}`, `{{fecha}}`, `{{hora}}`, `{{negocio}}`, `{{telefono}}`, `{{telefono_cliente}}`; se resuelven en `lib/notifications/templates.ts`, **escapando HTML** en los valores antes de interpolarlos en un correo.
+
+**`notification_settings`** — fila **singleton** (mismo truco que `site_settings`).
+`id (boolean pk), admin_email, admin_whatsapp, business_name, reminder_hours_before (1-168), birthday_send_day (1-28), updated_at`. `admin_email`/`admin_whatsapp` en `null` caen a `site_settings.email`/`whatsapp_number`.
+
+Además, `clients.marketing_opt_out boolean default false`: el saludo de cumpleaños es marketing (Ley 1581 de 2012) y lo respeta; solicitud y recordatorio son transaccionales y no dependen de esa bandera.
+
+### Vista `clients_with_stats` (migración 0013)
+
+Vista sobre `clients` + un `left join lateral` que cuenta las citas `COMPLETADA` y toma la última. `/admin/clientes` consulta esta vista con `.range()` + `count: 'exact'` en vez de traer todos los clientes y todas las citas y agregar en JavaScript.
+Columnas: las de `clients` (menos `marketing_opt_out`) + `visit_count int`, `last_visit timestamptz`.
+Se crea `with (security_invoker = true)` (Postgres 15+) para que **herede la RLS** de `clients`/`appointments` en vez de ejecutarse como su dueño. `grant select` **solo a `authenticated`** — nunca a `anon`: son datos personales, no contenido de marketing.
+Índices de apoyo: `pg_trgm` + GIN sobre `clients.name`/`clients.phone` (el buscador usa `ilike '%texto%'`, que sin trigramas degenera en seq scan) y un índice parcial `appointments (client_id, start_time desc) where status = 'COMPLETADA'`.
+
 ### RLS de las tablas de contenido
 Todas siguen el mismo patrón: `admin_full_access` (`for all to authenticated using (true) with check (true)`) + `public_read_active` (`for select to anon, authenticated using (active = true)`, con la condición extra de ventana de fechas en `promotions`). Es una excepción deliberada al patrón del resto de la app (donde el público nunca lee con la anon key) — es contenido de marketing de solo lectura, sin lógica sensible que proteger. `site_settings` no tiene condición `active` (es la única fila, siempre aplica).
+
+Las tres tablas de notificaciones **no** son contenido público: llevan solo `admin_full_access`, sin `public_read_active`. El cron las lee con el cliente `service_role`, que bypassa RLS.
 
 ## Server Actions
 
@@ -90,8 +119,11 @@ Todas en `app/admin/(dashboard)/actions.ts` salvo las dos marcadas como pública
 ### Contenido — Subida de archivos
 `uploadSiteMedia(folder, formData)` — acepta `image/*` o `video/*` (tope de 15MB para video), sube a Supabase Storage bucket `site-media`, devuelve la URL pública. `folder` es una de `'hero' | 'services' | 'gallery' | 'promos' | 'site'` (organización de carpetas, no hay lógica distinta por carpeta).
 
+### Notificaciones (`notification_templates`, `notification_settings`, `notifications`)
+`updateNotificationTemplate(id, {subject, body})`, `setNotificationTemplateEnabled(id, enabled)`, `updateNotificationSettings(input)`, `markWhatsAppNotificationSent(id)` (bandeja asistida: Manu manda el mensaje por `wa.me` y lo cierra acá), `skipWhatsAppNotification(id)`, `retryNotification(id)` (vuelve a `PENDIENTE` y despacha), `sendTestNotificationEmail(templateId, toOverride?)` (correo de prueba con valores de ejemplo), `setClientMarketingOptOut(clientId, optOut)`.
+
 ### Público (fuera de `/admin`)
-- `app/reservar/actions.ts` → `getAvailability(serviceId)`, `createBookingRequest(input)` — flujo de reserva pública, con honeypot + rate limit (`lib/booking/rate-limit.ts`), usa `createServiceClient()` (service role, bypassa RLS con validación propia).
+- `app/reservar/actions.ts` → `getAvailability(serviceId)`, `createBookingRequest(input)` — flujo de reserva pública, con honeypot + rate limit (`lib/booking/rate-limit.ts`), usa `createServiceClient()` (service role, bypassa RLS con validación propia). El wizard pide además un **correo opcional** (`clients.email`, que se rellena si estaba vacío pero nunca se pisa desde el formulario público). Tras el insert de la cita encola las notificaciones y las despacha dentro de `after()`: todo va en `try/catch`, un fallo de correo no puede tumbar una reserva.
 - `app/promo-actions.ts` → `submitPromoLead(input)` — captura del modal de promoción cuando `requires_birthday=true`. Mismo patrón anti-abuso y de no-sobreescritura que `createBookingRequest`.
 
 ### Agendamiento (sin cambios funcionales esta sesión, listadas por completitud)
@@ -169,10 +201,12 @@ Las secciones editoriales (`site_sections`) tienen además su **propio** `bg_col
 | 0010 | Video en el carrusel (`hero_slides.media_type`/`video_url`, `image_url` nullable) |
 | 0011 | `site_sections` (secciones editoriales) + `site_settings.theme_*` |
 | 0012 | `site_sections.kind` (unifica el orden con Servicios/Sobre-nosotros/Misión-Visión/Galería) + `bg_color`/`text_color` + `media_type` admite `'color'` |
+| 0013 | Búsqueda y paginación de clientes: `pg_trgm` + índices, vista `clients_with_stats` (`security_invoker`) |
+| 0014 | Notificaciones: `clients.marketing_opt_out`, `notification_templates` (+seed de plantillas), `notification_settings` (singleton), `notifications` (outbox) |
 
 Todas aditivas desde la 0002 (no hacen `drop`). Se corren a mano en el SQL Editor de Supabase Studio — no hay CLI/CI conectado a este proyecto de Supabase desde este entorno de desarrollo (ver `docs/HANDOFF-cms-contenido-fase-1.md`, sección de por qué).
 
 ## Estado de entornos
 
-- **Dev**: todas las migraciones (0001-0012) corridas, contenido real cargado, Manu ya usando el CMS activamente (confirmado varias veces en esta sesión: promo con flyer propio, video en el carrusel).
+- **Dev**: migraciones 0001-0012 corridas. **0013 y 0014 están escritas pero PENDIENTES de correr** — hasta que se corran, `/admin/clientes` y `/admin/notificaciones` muestran un aviso en pantalla explicando qué falta (degradan, no revientan), y el flujo público de reserva sigue funcionando igual, solo que sin encolar ninguna notificación. Contenido real cargado, contenido real cargado, Manu ya usando el CMS activamente (confirmado varias veces en esta sesión: promo con flyer propio, video en el carrusel).
 - **Producción**: no existe todavía. Todo el trabajo de esta sesión vive en la rama `preview`, sin mergear a `main`.
