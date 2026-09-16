@@ -3,9 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import {
   addDaysToDateStr,
   bogotaWallTimeToUtc,
-  formatDateStr,
   mondayOfWeek,
-  toBogotaWallClock,
+  todayInBogota,
   type DateStr,
 } from '@/lib/booking/timezone';
 import AgendaCalendar, {
@@ -29,7 +28,7 @@ export default async function AgendaPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const { date } = await searchParams;
-  const todayStr = formatDateStr(toBogotaWallClock(new Date()));
+  const todayStr = todayInBogota();
   const focusedDate = date || todayStr;
   const monday = mondayOfWeek(focusedDate);
 

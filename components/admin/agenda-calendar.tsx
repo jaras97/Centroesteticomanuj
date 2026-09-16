@@ -16,6 +16,7 @@ import {
   addDaysToDateStr,
   formatDateStr,
   formatDateStrHuman,
+  nowInBogota,
   toBogotaWallClock,
   type DateStr,
 } from '@/lib/booking/timezone';
@@ -62,6 +63,21 @@ const DENSITY_LABEL: Record<Density, string> = {
  * representa la hora de pared en Bogotá — para usar con timeZone='UTC' en FullCalendar. */
 function toFakeUtcIso(iso: string): string {
   return toBogotaWallClock(new Date(iso)).toISOString();
+}
+
+/**
+ * "Ahora" para FullCalendar, en la misma escala "falso-UTC" que los eventos.
+ *
+ * Como el calendario corre con `timeZone='UTC'` y todos los eventos se pintan
+ * con la hora de pared de Bogotá disfrazada de UTC (`toFakeUtcIso`), el "ahora"
+ * que calcula FullCalendar por defecto (el UTC real) queda 5 horas adelantado:
+ * la línea roja de `nowIndicator` se dibujaba 5h más abajo y el resaltado de
+ * "hoy" saltaba de día a las 19:00 de Bogotá. Pasándole esta función, el
+ * CalendarNowManager la vuelve a invocar en cada lectura (no fija un ancla),
+ * así que el indicador sigue avanzando en tiempo real.
+ */
+function fullCalendarNow(): Date {
+  return nowInBogota();
 }
 
 // Ventana por defecto del calendario — nunca se achica, solo se expande si hay
@@ -133,7 +149,9 @@ export default function AgendaCalendar({
   const [view, setView] = useState<CalendarView>('timeGridWeek');
   const [density, setDensity] = useState<Density>('media');
   const [selectedEvent, setSelectedEvent] = useState<SelectedAgendaEvent | null>(null);
-  const now = useMemo(() => new Date(), []);
+  // Instante real (no "falso-UTC") con el que se decide si una cita ya pasó.
+  // Comparar dos instantes reales entre sí no depende de la zona horaria.
+  const mountedAt = useMemo(() => new Date(), []);
 
   useEffect(() => {
     calendarRef.current?.getApi().gotoDate(focusedDate);
@@ -197,7 +215,7 @@ export default function AgendaCalendar({
       setSelectedEvent({
         kind: 'appointment',
         data: appointment,
-        isPast: new Date(appointment.end_time) < now,
+        isPast: new Date(appointment.end_time) < mountedAt,
       });
     } else if (kind === 'blocked' && block) {
       setSelectedEvent({ kind: 'blocked', data: block });
@@ -312,6 +330,7 @@ export default function AgendaCalendar({
             initialView='timeGridWeek'
             initialDate={focusedDate}
             timeZone='UTC'
+            now={fullCalendarNow}
             headerToolbar={false}
             dayHeaderFormat={{ weekday: 'short', day: 'numeric' }}
             firstDay={1}

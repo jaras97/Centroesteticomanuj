@@ -82,3 +82,17 @@ export function formatDateStrHuman(date: DateStr): string {
   const [year, month, day] = date.split('-').map(Number);
   return `${day} ${MONTHS_ES[month - 1]} ${year}`;
 }
+
+/**
+ * "Ahora" expresado como reloj de pared de Bogotá (sus getters UTC dan la
+ * hora que se ve en un reloj de Bogotá). Azúcar sobre `toBogotaWallClock`
+ * para el caso más común, que se repetía en media docena de archivos.
+ */
+export function nowInBogota(): Date {
+  return toBogotaWallClock(new Date());
+}
+
+/** La fecha de hoy ('YYYY-MM-DD') en Bogotá, sin depender de la zona del proceso. */
+export function todayInBogota(): DateStr {
+  return formatDateStr(nowInBogota());
+}
