@@ -25,7 +25,11 @@ export default function HeroSlidesTable({ slides: slidesProp }: { slides: HeroSl
   useEffect(() => setSlides(slidesProp), [slidesProp]);
 
   if (slides.length === 0) {
-    return <EmptyState icon={GalleryHorizontal} message='Todavía no hay diapositivas.' />;
+    return <EmptyState
+        icon={GalleryHorizontal}
+        message='Todavía no hay diapositivas.'
+        hint='Usa el botón "Nueva diapositiva" para armar el carrusel de la página de inicio.'
+      />;
   }
 
   function persistOrder(newOrder: HeroSlide[]) {

@@ -24,7 +24,11 @@ import type { Promotion } from '@/lib/supabase/types';
 
 export default function PromotionsTable({ promotions }: { promotions: Promotion[] }) {
   if (promotions.length === 0) {
-    return <EmptyState icon={Megaphone} message='Todavía no hay promociones.' />;
+    return <EmptyState
+        icon={Megaphone}
+        message='Todavía no hay promociones.'
+        hint='Usa el botón "Nueva promoción" para mostrar un anuncio al entrar a la página de inicio.'
+      />;
   }
 
   return (

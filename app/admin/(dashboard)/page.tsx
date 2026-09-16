@@ -1,9 +1,12 @@
-import { Cake, CalendarCheck, Inbox } from 'lucide-react';
+import Link from 'next/link';
+import { Cake, CalendarCheck, CalendarPlus, Inbox } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import SolicitudCard, { type SolicitudRow } from '@/components/admin/solicitud-card';
 import UpcomingBirthdays from '@/components/admin/upcoming-birthdays';
 import EmptyState from '@/components/admin/empty-state';
 import SummaryCard from '@/components/admin/summary-card';
+import StaggerIn from '@/components/admin/stagger-in';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { bogotaWallTimeToUtc, formatDateStr, toBogotaWallClock } from '@/lib/booking/timezone';
 import { daysUntilNextBirthday, isBirthdaySoon } from '@/lib/booking/birthdays';
@@ -60,21 +63,33 @@ export default async function BandejaPage() {
         Bandeja de solicitudes
       </h1>
 
-      <div className='grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8'>
+      <StaggerIn className='grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8'>
         <SummaryCard icon={Inbox} label='Solicitudes pendientes' value={rows.length} />
         <SummaryCard icon={CalendarCheck} label='Citas de hoy' value={todayCount ?? 0} />
         <SummaryCard icon={Cake} label='Cumpleaños esta semana' value={birthdaysThisWeek} />
-      </div>
+      </StaggerIn>
 
       <div className='grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 items-start'>
         {rows.length === 0 ? (
           <Card>
             <CardContent className='p-5'>
-              <EmptyState icon={Inbox} message='No hay solicitudes pendientes.' />
+              <EmptyState
+                icon={Inbox}
+                message='No hay solicitudes pendientes.'
+                hint='Todo al día. Las solicitudes que lleguen desde el sitio aparecerán aquí.'
+                action={
+                  <Button variant='outline' size='sm' asChild>
+                    <Link href='/admin/reservar'>
+                      <CalendarPlus className='h-4 w-4' />
+                      Agendar una cita manual
+                    </Link>
+                  </Button>
+                }
+              />
             </CardContent>
           </Card>
         ) : (
-          <div className='space-y-4'>
+          <StaggerIn className='space-y-4'>
             {rows.map((request) => (
               <SolicitudCard
                 key={request.id}
@@ -82,7 +97,7 @@ export default async function BandejaPage() {
                 isNewClient={!completedClientIds.has(request.client_id)}
               />
             ))}
-          </div>
+          </StaggerIn>
         )}
 
         <UpcomingBirthdays rows={upcomingBirthdays} />
