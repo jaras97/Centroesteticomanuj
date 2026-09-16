@@ -335,10 +335,15 @@ formatos distintos, no el mismo dato. La Server Action `updateNotificationSettin
 rechaza explícitamente una URL terminada en `.svg` para que no se configure un
 logo que en la práctica nadie vería.
 
-El PNG actual (`site-media/site/logo-email.png`, 240×242) se generó a partir del
-SVG del sitio con `sharp` a densidad 300 y se muestra a 60px de ancho. Para
-cambiarlo: subir el archivo nuevo al bucket `site-media` y pegar su URL pública
-en el campo del panel.
+El PNG se genera a partir del SVG del sitio con `sharp` a densidad 300 (240×242)
+y se muestra a 60px de ancho. Para ponerlo o cambiarlo: subir el archivo al
+bucket `site-media`, carpeta `site/`, **en el proyecto de Supabase que
+corresponda**, y pegar su URL pública en el campo del panel.
+
+> **Ojo: hay dos proyectos de Supabase**, uno de desarrollo y uno de producción,
+> con Storage independiente. La migración 0015 NO siembra una URL fija a
+> propósito: hacerlo haría que producción sirviera el logo desde el bucket de
+> desarrollo. Cada entorno apunta a su propio archivo.
 
 El atributo `alt` de la imagen lleva el nombre del negocio y va estilado con la
 tipografía y el color de la cabecera, no por accesibilidad nada más: muchos
