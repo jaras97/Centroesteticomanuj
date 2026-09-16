@@ -36,6 +36,8 @@ export interface NotificationContext {
   publicPhone: string;
   /** Correo público del centro (para la nota de baja del correo de cumpleaños). */
   publicEmail: string;
+  /** Logo PNG de la cabecera de los correos (el del sitio es SVG, ver buildEmailHtml). */
+  emailLogoUrl: string | null;
 }
 
 const FALLBACK_BUSINESS_NAME = 'Centro Estético Manuj';
@@ -64,6 +66,7 @@ export async function loadNotificationContext(
     admin_email: null,
     admin_whatsapp: null,
     business_name: FALLBACK_BUSINESS_NAME,
+    email_logo_url: null,
     reminder_hours_before: 24,
     birthday_send_day: 1,
     updated_at: new Date().toISOString(),
@@ -77,6 +80,7 @@ export async function loadNotificationContext(
     adminPhone: resolvedSettings.admin_whatsapp || site?.whatsapp_number || null,
     publicPhone: site?.phone_display || site?.whatsapp_number || '',
     publicEmail: site?.email || '',
+    emailLogoUrl: resolvedSettings.email_logo_url || null,
   };
 }
 
@@ -135,6 +139,7 @@ export async function enqueueNotifications(
     const rendered = renderTemplate(template, input.vars, {
       businessName: context.businessName,
       footerNote: input.footerNote,
+      logoUrl: context.emailLogoUrl,
     });
 
     return [

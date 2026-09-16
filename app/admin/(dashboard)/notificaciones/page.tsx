@@ -101,6 +101,7 @@ export default async function NotificacionesPage() {
           <NotificationTemplatesEditor
             templates={(templates ?? []) as NotificationTemplate[]}
             emailConfigured={isEmailConfigured()}
+            emailLogoUrl={settings?.email_logo_url ?? null}
           />
         </TabsContent>
 

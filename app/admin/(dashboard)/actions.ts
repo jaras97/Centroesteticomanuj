@@ -1513,6 +1513,7 @@ export async function updateNotificationSettings(input: {
   adminEmail: string;
   adminWhatsapp: string;
   businessName: string;
+  emailLogoUrl: string;
   reminderHoursBefore: number;
   birthdaySendDay: number;
 }) {
@@ -1530,6 +1531,21 @@ export async function updateNotificationSettings(input: {
   if (input.birthdaySendDay < 1 || input.birthdaySendDay > 28) {
     return { ok: false, error: 'El día de envío debe estar entre 1 y 28.' };
   }
+  // Se valida el formato y se rechaza SVG: ningún cliente de correo
+  // mayoritario lo renderiza, así que guardarlo sería configurar un logo que
+  // en la práctica no se ve (ver buildEmailHtml en lib/notifications/templates).
+  const logo = input.emailLogoUrl.trim();
+  if (logo) {
+    if (!/^https:\/\//i.test(logo)) {
+      return { ok: false, error: 'El logo debe ser una URL https.' };
+    }
+    if (/\.svg(\?|#|$)/i.test(logo)) {
+      return {
+        ok: false,
+        error: 'Los correos no pueden usar SVG (Gmail y Outlook no lo muestran). Sube el logo en PNG o JPG.',
+      };
+    }
+  }
 
   const { error } = await supabase
     .from('notification_settings')
@@ -1537,6 +1553,7 @@ export async function updateNotificationSettings(input: {
       admin_email: input.adminEmail.trim() || null,
       admin_whatsapp: input.adminWhatsapp.trim() || null,
       business_name: input.businessName.trim(),
+      email_logo_url: logo || null,
       reminder_hours_before: input.reminderHoursBefore,
       birthday_send_day: input.birthdaySendDay,
     })
@@ -1633,7 +1650,7 @@ export async function sendTestNotificationEmail(templateId: string, toOverride?:
 
   const { data: settings } = await supabase
     .from('notification_settings')
-    .select('admin_email, business_name')
+    .select('admin_email, business_name, email_logo_url')
     .eq('id', true)
     .maybeSingle();
 
@@ -1646,7 +1663,10 @@ export async function sendTestNotificationEmail(templateId: string, toOverride?:
   }
 
   const businessName = settings?.business_name || 'Centro Estético Manuj';
-  const rendered = renderTemplate(template, PREVIEW_VARS, { businessName });
+  const rendered = renderTemplate(template, PREVIEW_VARS, {
+    businessName,
+    logoUrl: settings?.email_logo_url ?? null,
+  });
 
   const result = await sendRawEmail({
     to,

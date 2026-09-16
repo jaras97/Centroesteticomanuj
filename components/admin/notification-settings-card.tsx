@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,7 @@ export default function NotificationSettingsCard({
   const [adminEmail, setAdminEmail] = useState(settings.admin_email ?? '');
   const [adminWhatsapp, setAdminWhatsapp] = useState(settings.admin_whatsapp ?? '');
   const [businessName, setBusinessName] = useState(settings.business_name ?? '');
+  const [emailLogoUrl, setEmailLogoUrl] = useState(settings.email_logo_url ?? '');
   const [reminderHours, setReminderHours] = useState(String(settings.reminder_hours_before));
   const [birthdayDay, setBirthdayDay] = useState(String(settings.birthday_send_day));
   const [isPending, startTransition] = useTransition();
@@ -30,6 +31,7 @@ export default function NotificationSettingsCard({
         adminEmail,
         adminWhatsapp,
         businessName,
+        emailLogoUrl,
         reminderHoursBefore: Number(reminderHours),
         birthdaySendDay: Number(birthdayDay),
       });
@@ -69,6 +71,36 @@ export default function NotificationSettingsCard({
             />
             <p className='text-xs text-gray-500'>
               Es lo que reemplaza a <code>{'{{negocio}}'}</code> y firma los correos.
+            </p>
+          </div>
+
+          <div className='space-y-2 sm:col-span-2'>
+            <Label htmlFor='notif-logo'>Logo de los correos</Label>
+            <div className='flex items-center gap-3'>
+              {emailLogoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={emailLogoUrl}
+                  alt='Vista previa del logo'
+                  className='h-12 w-12 shrink-0 rounded-md bg-brand-ink object-contain p-1'
+                />
+              ) : (
+                <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed text-gray-300'>
+                  <ImageIcon className='h-5 w-5' />
+                </div>
+              )}
+              <Input
+                id='notif-logo'
+                value={emailLogoUrl}
+                onChange={(e) => setEmailLogoUrl(e.target.value)}
+                placeholder='https://.../logo-email.png'
+              />
+            </div>
+            <p className='text-xs text-gray-500'>
+              Tiene que ser <strong>PNG o JPG</strong>, no SVG: Gmail y Outlook no
+              muestran SVG dentro de un correo. Por eso es un archivo distinto al
+              logo del sitio. Si lo dejas vacío, la cabecera muestra el nombre del
+              centro en texto.
             </p>
           </div>
 

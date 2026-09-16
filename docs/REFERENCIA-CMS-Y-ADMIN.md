@@ -203,6 +203,7 @@ Las secciones editoriales (`site_sections`) tienen además su **propio** `bg_col
 | 0012 | `site_sections.kind` (unifica el orden con Servicios/Sobre-nosotros/Misión-Visión/Galería) + `bg_color`/`text_color` + `media_type` admite `'color'` |
 | 0013 | Búsqueda y paginación de clientes: `pg_trgm` + índices, vista `clients_with_stats` (`security_invoker`) |
 | 0014 | Notificaciones: `clients.marketing_opt_out`, `notification_templates` (+seed de plantillas), `notification_settings` (singleton), `notifications` (outbox) |
+| 0015 | `notification_settings.email_logo_url` — logo PNG de la cabecera de los correos (el del sitio es SVG y los clientes de correo no lo renderizan) |
 
 Todas aditivas desde la 0002 (no hacen `drop`). Se corren a mano en el SQL Editor de Supabase Studio — no hay CLI/CI conectado a este proyecto de Supabase desde este entorno de desarrollo (ver `docs/HANDOFF-cms-contenido-fase-1.md`, sección de por qué).
 
