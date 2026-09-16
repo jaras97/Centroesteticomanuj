@@ -105,3 +105,49 @@ html {
     @apply bg-background text-foreground;
   }
 }
+
+/* ── Panel administrativo: sidebar colapsable ───────────────────────────────
+   El ancho del sidebar se resuelve con una variable CSS y no con estado de
+   React: el estado colapsado se aplica como atributo `data-admin-sidebar` en
+   el <html> desde un script inline que corre antes del primer pintado
+   (`components/admin/admin-sidebar-script.tsx`). El servidor no puede conocer
+   `localStorage`, así que si el ancho dependiera del estado de React el panel
+   guardado como colapsado se pintaría ancho y saltaría al hidratar.
+   Lo mismo con lo que se oculta al colapsar: se hace por CSS para que el HTML
+   del servidor y el del cliente sean idénticos (cero mismatch de hidratación).
+   Ver `lib/admin/sidebar-preference.ts`. */
+:root {
+  --admin-sidebar-w: 16rem;
+}
+
+html[data-admin-sidebar='collapsed'] {
+  --admin-sidebar-w: 4.5rem;
+}
+
+/* Etiquetas, títulos de grupo y email: solo tienen sentido con el panel abierto. */
+html[data-admin-sidebar='collapsed'] .admin-sidebar-expanded-only {
+  display: none;
+}
+
+/* Al colapsar, los items quedan reducidos al ícono: hay que centrarlo. */
+html[data-admin-sidebar='collapsed'] .admin-sidebar-row {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* El botón de colapsar es el mismo ícono girado, así no hay que intercambiar
+   nodos según el estado (que volvería a depender de React). */
+html[data-admin-sidebar='collapsed'] .admin-sidebar-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* Inverso de `admin-sidebar-expanded-only`: separadores que reemplazan a los
+   títulos de grupo cuando el sidebar está reducido a íconos. */
+.admin-sidebar-collapsed-only {
+  display: none;
+}
+
+html[data-admin-sidebar='collapsed'] .admin-sidebar-collapsed-only {
+  display: block;
+}
