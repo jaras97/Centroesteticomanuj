@@ -7,6 +7,11 @@ import { bogotaWallTimeToUtc } from '@/lib/booking/timezone';
 import { dispatchQuietly } from '@/lib/notifications/dispatch';
 import { emailConfigurationIssue, sendRawEmail } from '@/lib/notifications/channels/email';
 import { PREVIEW_VARS, renderTemplate } from '@/lib/notifications/templates';
+import type {
+  ExpenseNature,
+  FinancialAccountKind,
+  MovementKind,
+} from '@/lib/supabase/types';
 
 async function requireUser() {
   const supabase = await createClient();
@@ -148,10 +153,66 @@ async function resolvePerformedServiceId(
   return { ok: true, serviceId: service.id };
 }
 
+/**
+ * Resuelve la cuenta elegida en los diálogos de cobro. Devuelve además el
+ * nombre, porque `appointments.payment_method` se SIGUE escribiendo con él:
+ * es el texto que muestra el historial de citas desde 0003, y dejarlo vacío
+ * borraría esa columna de las citas nuevas. `account_id` es el dato
+ * agregable; `payment_method` queda como etiqueta legible y de respaldo.
+ */
+async function resolveChargeAccount(
+  supabase: Awaited<ReturnType<typeof requireUser>>,
+  accountId: string | undefined,
+): Promise<{ ok: true; accountId: string | null; name: string | null } | { ok: false; error: string }> {
+  if (!accountId) return { ok: true, accountId: null, name: null };
+
+  const { data: account } = await supabase
+    .from('financial_accounts')
+    .select('id, name')
+    .eq('id', accountId)
+    .maybeSingle();
+
+  if (!account) return { ok: false, error: 'Esa cuenta ya no existe.' };
+  return { ok: true, accountId: account.id, name: account.name };
+}
+
+/**
+ * Campos de cobro de una cita, SIN pisar lo que ya estaba guardado cuando no
+ * llegó cuenta ni método.
+ *
+ * `ChargeAccountSelect` no ofrece "sin asignar": una vez elegida, la cuenta no
+ * se puede desasignar desde la UI, así que `accountId === undefined` siempre
+ * significa "no me mandaron cuenta", nunca "bórrala". Escribir `null` a ciegas
+ * borraba datos en dos casos reales:
+ *
+ *  · una cita anterior a 0016 con `payment_method` de texto libre que no calzó
+ *    con ninguna cuenta ("Daviplata"): corregir solo el monto lo dejaba en
+ *    null y el desglose "De dónde entró la plata" perdía la etiqueta;
+ *  · una cita cuya cuenta ya está desactivada (el selector solo lista activas)
+ *    o cuyo detalle todavía no terminó de cargar.
+ */
+function chargeAccountFields(
+  account: { accountId: string | null; name: string | null },
+  legacyPaymentMethod: string | undefined,
+) {
+  if (account.accountId) {
+    // `payment_method` se sigue escribiendo con el nombre de la cuenta: es lo
+    // que muestra el historial de citas desde 0003.
+    return { account_id: account.accountId, payment_method: account.name };
+  }
+  if (legacyPaymentMethod) {
+    return { payment_method: legacyPaymentMethod };
+  }
+  return {};
+}
+
 export async function completeAppointment(
   id: string,
   input: {
     chargedAmount: number;
+    /** Cuenta (`financial_accounts`) a la que entró la plata. */
+    accountId?: string;
+    /** @deprecated Texto libre anterior a 0016. Solo se usa si no hay `accountId`. */
     paymentMethod?: string;
     appliedRewardId?: string;
     /** Servicio realmente realizado, si difiere del agendado. */
@@ -168,6 +229,15 @@ export async function completeAppointment(
 
   if (!appointment) return { ok: false, error: 'Cita no encontrada.' };
 
+  // El monto llega de un <input type="number">: puede venir NaN, con decimales
+  // o negativo. Sin esto, un NaN se serializa como null y la cita quedaba
+  // COMPLETADA sin valor cobrado (invisible en Finanzas), y un decimal hacía
+  // fallar el insert contra la columna `int`. Mismo criterio que
+  // `updateAppointmentCharge`.
+  if (!Number.isFinite(input.chargedAmount) || input.chargedAmount < 0) {
+    return { ok: false, error: 'El valor cobrado no es válido.' };
+  }
+
   // Antes de tocar el cupón: si el servicio no es válido, no se quema nada.
   const performed = await resolvePerformedServiceId(
     supabase,
@@ -175,6 +245,9 @@ export async function completeAppointment(
     input.serviceId,
   );
   if (!performed.ok) return { ok: false, error: performed.error };
+
+  const account = await resolveChargeAccount(supabase, input.accountId);
+  if (!account.ok) return { ok: false, error: account.error };
 
   if (input.appliedRewardId) {
     const { data: reward } = await supabase
@@ -199,8 +272,8 @@ export async function completeAppointment(
     .from('appointments')
     .update({
       status: 'COMPLETADA',
-      charged_amount: input.chargedAmount,
-      payment_method: input.paymentMethod || null,
+      charged_amount: Math.round(input.chargedAmount),
+      ...chargeAccountFields(account, input.paymentMethod),
       ...(performed.serviceId && { service_id: performed.serviceId }),
     })
     .eq('id', id);
@@ -224,6 +297,8 @@ export interface AppointmentDetail {
   buffer_min: number;
   charged_amount: number | null;
   payment_method: string | null;
+  /** Cuenta a la que entró el ingreso (0016). Prellena el selector de cuenta. */
+  account_id: string | null;
   deposit_received_amount: number | null;
   requested_name: string;
   client_note: string | null;
@@ -282,6 +357,7 @@ export async function getAppointmentDetail(id: string): Promise<AppointmentDetai
     buffer_min: row.buffer_min as number,
     charged_amount: (row.charged_amount as number | null) ?? null,
     payment_method: (row.payment_method as string | null) ?? null,
+    account_id: (row.account_id as string | null) ?? null,
     deposit_received_amount: (row.deposit_received_amount as number | null) ?? null,
     requested_name: row.requested_name as string,
     client_note: (row.client_note as string | null) ?? null,
@@ -296,8 +372,8 @@ export async function getAppointmentDetail(id: string): Promise<AppointmentDetai
 }
 
 /**
- * Corrige una cita ya completada: servicio realizado, valor cobrado y método
- * de pago. Hasta ahora esos datos solo se podían escribir en la transición
+ * Corrige una cita ya completada: servicio realizado, valor cobrado y cuenta a
+ * la que entró la plata. Hasta ahora esos datos solo se podían escribir en la transición
  * CONFIRMADA → COMPLETADA, así que un error de tecleo — o un cambio de
  * servicio que se descubrió al cerrar la cita — quedaba fijo para siempre en
  * Finanzas. No re-evalúa fidelización (el cupón se otorga por número de
@@ -305,7 +381,14 @@ export async function getAppointmentDetail(id: string): Promise<AppointmentDetai
  */
 export async function updateAppointmentCharge(
   id: string,
-  input: { chargedAmount: number; paymentMethod?: string; serviceId?: string },
+  input: {
+    chargedAmount: number;
+    /** Cuenta (`financial_accounts`) a la que entró la plata. */
+    accountId?: string;
+    /** @deprecated Texto libre anterior a 0016. Solo se usa si no hay `accountId`. */
+    paymentMethod?: string;
+    serviceId?: string;
+  },
 ) {
   const supabase = await requireUser();
 
@@ -330,11 +413,14 @@ export async function updateAppointmentCharge(
   );
   if (!performed.ok) return { ok: false, error: performed.error };
 
+  const account = await resolveChargeAccount(supabase, input.accountId);
+  if (!account.ok) return { ok: false, error: account.error };
+
   const { error } = await supabase
     .from('appointments')
     .update({
       charged_amount: Math.round(input.chargedAmount),
-      payment_method: input.paymentMethod || null,
+      ...chargeAccountFields(account, input.paymentMethod),
       ...(performed.serviceId && { service_id: performed.serviceId }),
     })
     .eq('id', id);
@@ -822,7 +908,9 @@ type ReorderableTable =
   | 'hero_slides'
   | 'service_categories'
   | 'gallery_images'
-  | 'site_sections';
+  | 'site_sections'
+  | 'financial_accounts'
+  | 'expense_categories';
 
 // Recibe el orden completo (ids) tal como quedó tras arrastrar en el admin
 // (ver components/admin/*-table.tsx, framer-motion Reorder) y lo persiste
@@ -1391,30 +1479,449 @@ export async function reorderSiteSections(orderedIds: string[]) {
   return result;
 }
 
-interface ExpenseInput {
-  expenseDate: string;
-  category: string;
-  description?: string;
-  amount: number;
-}
+// ---------------------------------------------------------------------------
+// Finanzas (/admin/finanzas) — modelo de la migración 0016
+// ---------------------------------------------------------------------------
+// Tres números que antes eran uno solo y no hay que volver a confundir:
+//   · Utilidad del negocio (P&L) = ingresos operativos − gastos operativos.
+//     RETIRO y APORTE **no** entran.
+//   · Caja disponible = acumulado histórico real; RETIRO y APORTE **sí** entran.
+//   · Retirado en el mes = Σ RETIRO.
+// Un retiro no es un gasto: es utilidad ya ganada que cambia de bolsillo.
+// La agregación vive en lib/finance/queries.ts; acá solo se escribe.
 
 function revalidateFinanzas() {
   revalidatePath('/admin/finanzas');
 }
 
-export async function createExpense(input: ExpenseInput) {
-  const supabase = await requireUser();
+const DATE_STR_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MONTH_STR_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-  if (!input.category.trim()) return { ok: false, error: 'La categoría es obligatoria.' };
-  if (!input.amount || input.amount <= 0) {
-    return { ok: false, error: 'El monto debe ser mayor a cero.' };
+/** Los montos son pesos colombianos enteros: no hay centavos en COP. */
+function normalizeAmount(amount: number): number | null {
+  if (!Number.isFinite(amount)) return null;
+  const rounded = Math.round(amount);
+  return rounded > 0 ? rounded : null;
+}
+
+function isValidDateStr(value: string): boolean {
+  if (!DATE_STR_RE.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  // Se valida con getters UTC sobre Date.UTC: el proceso corre en UTC y los
+  // getters locales darían otro día. Atrapa cosas como '2026-02-31'.
+  const parsed = new Date(Date.UTC(y, m - 1, d));
+  return (
+    parsed.getUTCFullYear() === y &&
+    parsed.getUTCMonth() === m - 1 &&
+    parsed.getUTCDate() === d
+  );
+}
+
+export interface FinancialMovementInput {
+  /** 'YYYY-MM-DD'. `movement_date` es un `date` simple, sin hora ni zona. */
+  movementDate: string;
+  kind: MovementKind;
+  amount: number;
+  accountId?: string | null;
+  /** Solo se guarda en kind='GASTO'; en el resto se limpia. */
+  categoryId?: string | null;
+  description?: string | null;
+  recurringTemplateId?: string | null;
+}
+
+const MOVEMENT_KINDS: MovementKind[] = ['INGRESO_OTRO', 'GASTO', 'RETIRO', 'APORTE'];
+
+type MovementRow = {
+  movement_date: string;
+  kind: MovementKind;
+  amount: number;
+  account_id: string | null;
+  category_id: string | null;
+  description: string | null;
+  recurring_template_id: string | null;
+};
+
+function buildMovementRow(
+  input: FinancialMovementInput,
+): { ok: true; row: MovementRow } | { ok: false; error: string } {
+  if (!MOVEMENT_KINDS.includes(input.kind)) {
+    return { ok: false, error: 'Tipo de movimiento inválido.' };
+  }
+  if (!isValidDateStr(input.movementDate)) {
+    return { ok: false, error: 'La fecha no es válida.' };
   }
 
-  const { error } = await supabase.from('expenses').insert({
-    expense_date: input.expenseDate,
-    category: input.category.trim(),
-    description: input.description?.trim() || null,
-    amount: input.amount,
+  const amount = normalizeAmount(input.amount);
+  if (amount === null) return { ok: false, error: 'El monto debe ser mayor a cero.' };
+
+  return {
+    ok: true,
+    row: {
+      movement_date: input.movementDate,
+      kind: input.kind,
+      amount,
+      account_id: input.accountId || null,
+      // Una categoría de gasto en un retiro o en un ingreso no significa nada
+      // y ensuciaría el desglose por categoría: se descarta en silencio.
+      category_id: input.kind === 'GASTO' ? input.categoryId || null : null,
+      description: input.description?.trim() || null,
+      recurring_template_id: input.recurringTemplateId || null,
+    },
+  };
+}
+
+export async function createFinancialMovement(input: FinancialMovementInput) {
+  const supabase = await requireUser();
+
+  const built = buildMovementRow(input);
+  if (!built.ok) return { ok: false, error: built.error };
+
+  const { error } = await supabase.from('financial_movements').insert(built.row);
+  if (error) return { ok: false, error: 'No se pudo registrar el movimiento.' };
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function updateFinancialMovement(id: string, input: FinancialMovementInput) {
+  const supabase = await requireUser();
+
+  const built = buildMovementRow(input);
+  if (!built.ok) return { ok: false, error: built.error };
+
+  const { error } = await supabase
+    .from('financial_movements')
+    .update(built.row)
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar el movimiento.' };
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function deleteFinancialMovement(id: string) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('financial_movements').delete().eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo eliminar el movimiento.' };
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+// --- Cuentas ---------------------------------------------------------------
+// Sin borrado duro: `financial_movements.account_id` es `on delete restrict`
+// (borrar una cuenta con movimientos descuadraría la caja en silencio) y una
+// cuenta vieja sigue explicando de dónde salió la plata del histórico.
+
+export interface FinancialAccountInput {
+  name: string;
+  kind: FinancialAccountKind;
+  openingBalance?: number;
+}
+
+const ACCOUNT_KINDS: FinancialAccountKind[] = ['EFECTIVO', 'DIGITAL', 'BANCO', 'OTRO'];
+
+function validateAccountInput(input: FinancialAccountInput): string | null {
+  if (!input.name.trim()) return 'El nombre es obligatorio.';
+  if (!ACCOUNT_KINDS.includes(input.kind)) return 'El tipo de cuenta no es válido.';
+  const opening = input.openingBalance ?? 0;
+  if (!Number.isFinite(opening)) return 'El saldo inicial no es válido.';
+  return null;
+}
+
+export async function createFinancialAccount(input: FinancialAccountInput) {
+  const supabase = await requireUser();
+
+  const invalid = validateAccountInput(input);
+  if (invalid) return { ok: false, error: invalid };
+
+  const { data: last } = await supabase
+    .from('financial_accounts')
+    .select('display_order')
+    .order('display_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase.from('financial_accounts').insert({
+    name: input.name.trim(),
+    kind: input.kind,
+    opening_balance: Math.round(input.openingBalance ?? 0),
+    display_order: (last?.display_order ?? -1) + 1,
+  });
+
+  if (error) {
+    // El unique en `name` es lo que hace idempotente el seed de 0016.
+    if (error.code === '23505') return { ok: false, error: 'Ya existe una cuenta con ese nombre.' };
+    return { ok: false, error: 'No se pudo crear la cuenta.' };
+  }
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function updateFinancialAccount(id: string, input: FinancialAccountInput) {
+  const supabase = await requireUser();
+
+  const invalid = validateAccountInput(input);
+  if (invalid) return { ok: false, error: invalid };
+
+  const { error } = await supabase
+    .from('financial_accounts')
+    .update({
+      name: input.name.trim(),
+      kind: input.kind,
+      opening_balance: Math.round(input.openingBalance ?? 0),
+    })
+    .eq('id', id);
+
+  if (error) {
+    if (error.code === '23505') return { ok: false, error: 'Ya existe una cuenta con ese nombre.' };
+    return { ok: false, error: 'No se pudo actualizar la cuenta.' };
+  }
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function setFinancialAccountActive(id: string, active: boolean) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('financial_accounts').update({ active }).eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar la cuenta.' };
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function reorderFinancialAccounts(orderedIds: string[]) {
+  const supabase = await requireUser();
+  const result = await reorderRows(supabase, 'financial_accounts', orderedIds);
+  revalidateFinanzas();
+  return result;
+}
+
+// --- Categorías de gasto ---------------------------------------------------
+// También sin borrado duro: aunque la FK es `on delete set null`, borrar una
+// categoría dejaría huérfanos los gastos históricos y su desglose mentiría.
+
+export interface ExpenseCategoryInput {
+  name: string;
+  nature: ExpenseNature;
+}
+
+const EXPENSE_NATURES: ExpenseNature[] = ['FIJO', 'VARIABLE'];
+
+function validateCategoryInput(input: ExpenseCategoryInput): string | null {
+  if (!input.name.trim()) return 'El nombre es obligatorio.';
+  if (!EXPENSE_NATURES.includes(input.nature)) return 'El tipo de gasto no es válido.';
+  return null;
+}
+
+export async function createExpenseCategory(input: ExpenseCategoryInput) {
+  const supabase = await requireUser();
+
+  const invalid = validateCategoryInput(input);
+  if (invalid) return { ok: false, error: invalid };
+
+  const { data: last } = await supabase
+    .from('expense_categories')
+    .select('display_order')
+    .order('display_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase.from('expense_categories').insert({
+    name: input.name.trim(),
+    nature: input.nature,
+    display_order: (last?.display_order ?? -1) + 1,
+  });
+
+  if (error) {
+    if (error.code === '23505') return { ok: false, error: 'Ya existe una categoría con ese nombre.' };
+    return { ok: false, error: 'No se pudo crear la categoría.' };
+  }
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function updateExpenseCategory(id: string, input: ExpenseCategoryInput) {
+  const supabase = await requireUser();
+
+  const invalid = validateCategoryInput(input);
+  if (invalid) return { ok: false, error: invalid };
+
+  const { error } = await supabase
+    .from('expense_categories')
+    .update({ name: input.name.trim(), nature: input.nature })
+    .eq('id', id);
+
+  if (error) {
+    if (error.code === '23505') return { ok: false, error: 'Ya existe una categoría con ese nombre.' };
+    return { ok: false, error: 'No se pudo actualizar la categoría.' };
+  }
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function setExpenseCategoryActive(id: string, active: boolean) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('expense_categories').update({ active }).eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar la categoría.' };
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function reorderExpenseCategories(orderedIds: string[]) {
+  const supabase = await requireUser();
+  const result = await reorderRows(supabase, 'expense_categories', orderedIds);
+  revalidateFinanzas();
+  return result;
+}
+
+// --- Gastos recurrentes ----------------------------------------------------
+// Acá SÍ hay borrado duro: una plantilla es una conveniencia, no un dato
+// contable. Los movimientos que generó sobreviven (`recurring_template_id` es
+// `on delete set null`), así que borrarla no altera ninguna cifra.
+
+export interface RecurringExpenseInput {
+  name: string;
+  amount: number;
+  /** 1-28, para que la plantilla exista en todos los meses (febrero incluido). */
+  dayOfMonth: number;
+  categoryId?: string | null;
+  accountId?: string | null;
+}
+
+function validateRecurringInput(input: RecurringExpenseInput): string | null {
+  if (!input.name.trim()) return 'El nombre es obligatorio.';
+  if (normalizeAmount(input.amount) === null) return 'El monto debe ser mayor a cero.';
+  if (
+    !Number.isInteger(input.dayOfMonth) ||
+    input.dayOfMonth < 1 ||
+    input.dayOfMonth > 28
+  ) {
+    return 'El día del mes debe estar entre 1 y 28.';
+  }
+  return null;
+}
+
+export async function createRecurringExpense(input: RecurringExpenseInput) {
+  const supabase = await requireUser();
+
+  const invalid = validateRecurringInput(input);
+  if (invalid) return { ok: false, error: invalid };
+
+  const { error } = await supabase.from('recurring_expenses').insert({
+    name: input.name.trim(),
+    amount: normalizeAmount(input.amount)!,
+    day_of_month: input.dayOfMonth,
+    category_id: input.categoryId || null,
+    account_id: input.accountId || null,
+  });
+
+  if (error) return { ok: false, error: 'No se pudo crear el gasto recurrente.' };
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function updateRecurringExpense(id: string, input: RecurringExpenseInput) {
+  const supabase = await requireUser();
+
+  const invalid = validateRecurringInput(input);
+  if (invalid) return { ok: false, error: invalid };
+
+  const { error } = await supabase
+    .from('recurring_expenses')
+    .update({
+      name: input.name.trim(),
+      amount: normalizeAmount(input.amount)!,
+      day_of_month: input.dayOfMonth,
+      category_id: input.categoryId || null,
+      account_id: input.accountId || null,
+    })
+    .eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar el gasto recurrente.' };
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function setRecurringExpenseActive(id: string, active: boolean) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('recurring_expenses').update({ active }).eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo actualizar el gasto recurrente.' };
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+export async function deleteRecurringExpense(id: string) {
+  const supabase = await requireUser();
+  const { error } = await supabase.from('recurring_expenses').delete().eq('id', id);
+
+  if (error) return { ok: false, error: 'No se pudo eliminar el gasto recurrente.' };
+
+  revalidateFinanzas();
+  return { ok: true };
+}
+
+/**
+ * Registra el gasto de una plantilla recurrente en un mes concreto ('YYYY-MM').
+ * No hay cron que lo haga solo, a propósito: un gasto fijo puede cambiar de
+ * monto o no pagarse, y un movimiento inventado es peor que ninguno.
+ *
+ * El chequeo de duplicados se hace en consulta (no hay índice único: el mismo
+ * gasto fijo podría legítimamente pagarse dos veces en un mes por un ajuste),
+ * lo cual alcanza para un panel de un solo usuario.
+ */
+export async function registerRecurringExpense(templateId: string, month: string) {
+  const supabase = await requireUser();
+
+  if (!MONTH_STR_RE.test(month)) return { ok: false, error: 'El mes no es válido.' };
+
+  const { data: template } = await supabase
+    .from('recurring_expenses')
+    .select('*')
+    .eq('id', templateId)
+    .maybeSingle();
+
+  if (!template) return { ok: false, error: 'Ese gasto recurrente no existe.' };
+
+  const monthStart = `${month}-01`;
+  const [y, m] = month.split('-').map(Number);
+  const nextMonth = new Date(Date.UTC(y, m, 1));
+  const monthEndExclusive = `${nextMonth.getUTCFullYear()}-${String(
+    nextMonth.getUTCMonth() + 1,
+  ).padStart(2, '0')}-01`;
+
+  const { count } = await supabase
+    .from('financial_movements')
+    .select('id', { count: 'exact', head: true })
+    .eq('recurring_template_id', templateId)
+    .gte('movement_date', monthStart)
+    .lt('movement_date', monthEndExclusive);
+
+  if ((count ?? 0) > 0) {
+    return { ok: false, error: 'Ese gasto ya está registrado este mes.' };
+  }
+
+  const { error } = await supabase.from('financial_movements').insert({
+    movement_date: `${month}-${String(template.day_of_month).padStart(2, '0')}`,
+    kind: 'GASTO',
+    amount: template.amount,
+    account_id: template.account_id,
+    category_id: template.category_id,
+    description: template.name,
+    recurring_template_id: template.id,
   });
 
   if (error) return { ok: false, error: 'No se pudo registrar el gasto.' };
@@ -1423,39 +1930,15 @@ export async function createExpense(input: ExpenseInput) {
   return { ok: true };
 }
 
-export async function updateExpense(id: string, input: ExpenseInput) {
-  const supabase = await requireUser();
-
-  if (!input.category.trim()) return { ok: false, error: 'La categoría es obligatoria.' };
-  if (!input.amount || input.amount <= 0) {
-    return { ok: false, error: 'El monto debe ser mayor a cero.' };
-  }
-
-  const { error } = await supabase
-    .from('expenses')
-    .update({
-      expense_date: input.expenseDate,
-      category: input.category.trim(),
-      description: input.description?.trim() || null,
-      amount: input.amount,
-    })
-    .eq('id', id);
-
-  if (error) return { ok: false, error: 'No se pudo actualizar el gasto.' };
-
-  revalidateFinanzas();
-  return { ok: true };
-}
-
-export async function deleteExpense(id: string) {
-  const supabase = await requireUser();
-  const { error } = await supabase.from('expenses').delete().eq('id', id);
-
-  if (error) return { ok: false, error: 'No se pudo eliminar el gasto.' };
-
-  revalidateFinanzas();
-  return { ok: true };
-}
+// La tabla `expenses` quedó MUERTA con la migración 0016: se conserva intacta
+// (regla aditiva del proyecto, los dos proyectos de Supabase tienen datos
+// reales) pero nadie la lee ni le escribe — sus filas se copiaron a
+// `financial_movements` con kind='GASTO' y `legacy_expense_id`. Las acciones
+// de compatibilidad `createExpense`/`updateExpense`/`deleteExpense` se
+// eliminaron junto con la UI que las usaba (`expenses-table.tsx`,
+// `expense-form-dialog.tsx`): un export de un archivo 'use server' es un
+// endpoint público, y no tiene sentido mantener tres que nadie llama.
+// Todo gasto nuevo entra por `createFinancialMovement` con kind='GASTO'.
 
 export async function signOut() {
   const supabase = await createClient();

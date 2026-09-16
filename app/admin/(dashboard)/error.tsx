@@ -41,12 +41,12 @@ export default function AdminError({
           <RotateCw className='h-4 w-4' />
           Reintentar
         </Button>
-        <Link href='/admin'>
-          <Button variant='outline'>
+        <Button asChild variant='outline'>
+          <Link href='/admin'>
             <Inbox className='h-4 w-4' />
             Ir a la bandeja
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
     </div>
   );

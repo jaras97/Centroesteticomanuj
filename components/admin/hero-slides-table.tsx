@@ -1,14 +1,22 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import Image from 'next/image';
-import { Reorder, useDragControls } from 'framer-motion';
+import { Reorder, useDragControls, useReducedMotion } from 'framer-motion';
 import { toast } from 'sonner';
-import { GalleryHorizontal, GripVertical, Loader2, Video } from 'lucide-react';
+import { GalleryHorizontal, Loader2, Video } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import EmptyState from '@/components/admin/empty-state';
 import HeroSlideFormDialog from '@/components/admin/hero-slide-form-dialog';
+import ReorderHandle, {
+  ReorderAnnouncer,
+  reorderItemMotion,
+} from '@/components/admin/reorder-handle';
+import {
+  useKeyboardReorder,
+  type ReorderHandleProps,
+} from '@/lib/admin/use-keyboard-reorder';
 import {
   deleteHeroSlide,
   reorderHeroSlides,
@@ -17,12 +25,15 @@ import {
 import type { HeroSlide } from '@/lib/supabase/types';
 
 export default function HeroSlidesTable({ slides: slidesProp }: { slides: HeroSlide[] }) {
-  const [slides, setSlides] = useState(slidesProp);
-  // El padre (Server Component) re-envía props frescas después de cada
-  // revalidatePath (crear/editar/activar/eliminar) — se sincroniza acá.
-  // El propio arrastre ya actualizó este mismo estado de forma optimista
-  // antes de que la revalidación vuelva, así que esto no produce parpadeo.
-  useEffect(() => setSlides(slidesProp), [slidesProp]);
+  // Orden optimista + teclado + anuncio, compartido con las otras listas
+  // ordenables (ver `lib/admin/use-keyboard-reorder.ts`).
+  const { items: slides, setItems: setSlides, getHandleProps, onDragEnd, announcer } =
+    useKeyboardReorder({
+      items: slidesProp,
+      getLabel: (slide) => slide.title,
+      itemNoun: 'la diapositiva',
+      persist: reorderHeroSlides,
+    });
 
   if (slides.length === 0) {
     return <EmptyState
@@ -32,30 +43,41 @@ export default function HeroSlidesTable({ slides: slidesProp }: { slides: HeroSl
       />;
   }
 
-  function persistOrder(newOrder: HeroSlide[]) {
-    reorderHeroSlides(newOrder.map((s) => s.id)).then((result) => {
-      if (!result.ok) toast.error(result.error);
-    });
-  }
-
   return (
-    <Reorder.Group
-      as='ul'
-      axis='y'
-      values={slides}
-      onReorder={setSlides}
-      className='space-y-2'
-    >
-      {slides.map((slide) => (
-        <SlideRow key={slide.id} slide={slide} onDragEnd={() => persistOrder(slides)} />
-      ))}
-    </Reorder.Group>
+    <>
+      <ReorderAnnouncer {...announcer} />
+      <Reorder.Group
+        as='ul'
+        axis='y'
+        values={slides}
+        onReorder={setSlides}
+        className='space-y-2'
+      >
+        {slides.map((slide, index) => (
+          <SlideRow
+            key={slide.id}
+            slide={slide}
+            handle={getHandleProps(slide, index)}
+            onDragEnd={onDragEnd}
+          />
+        ))}
+      </Reorder.Group>
+    </>
   );
 }
 
-function SlideRow({ slide, onDragEnd }: { slide: HeroSlide; onDragEnd: () => void }) {
+function SlideRow({
+  slide,
+  handle,
+  onDragEnd,
+}: {
+  slide: HeroSlide;
+  handle: ReorderHandleProps;
+  onDragEnd: () => void;
+}) {
   const [isPending, startTransition] = useTransition();
   const dragControls = useDragControls();
+  const reduceMotion = useReducedMotion();
 
   function toggleActive() {
     startTransition(async () => {
@@ -79,17 +101,10 @@ function SlideRow({ slide, onDragEnd }: { slide: HeroSlide; onDragEnd: () => voi
       dragControls={dragControls}
       onDragEnd={onDragEnd}
       className='flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border bg-white p-3 shadow-sm'
-      whileDrag={{ boxShadow: '0 8px 20px rgba(0,0,0,0.12)', scale: 1.01 }}
+      {...reorderItemMotion(reduceMotion)}
     >
       <div className='flex items-center gap-3 min-w-0 w-full sm:w-auto'>
-        <button
-          type='button'
-          onPointerDown={(e) => dragControls.start(e)}
-          className='shrink-0 cursor-grab touch-none text-gray-300 hover:text-gray-500 active:cursor-grabbing'
-          aria-label='Arrastrar para reordenar'
-        >
-          <GripVertical className='h-5 w-5' />
-        </button>
+        <ReorderHandle dragControls={dragControls} {...handle} />
 
         <div className='relative h-12 w-20 shrink-0 rounded overflow-hidden bg-gray-100 flex items-center justify-center'>
           {slide.image_url ? (

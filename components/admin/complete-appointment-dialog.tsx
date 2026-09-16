@@ -14,13 +14,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import PerformedServiceSelect from '@/components/admin/performed-service-select';
+import ChargeAccountSelect from '@/components/admin/charge-account-select';
 import { completeAppointment, getAvailableRewards } from '@/app/admin/(dashboard)/actions';
 import { formatCOP } from '@/lib/format';
-import type { LoyaltyReward } from '@/lib/supabase/types';
-
-const PAYMENT_METHODS = ['Efectivo', 'Transferencia', 'Tarjeta', 'Otro'];
+import type { FinancialAccount, LoyaltyReward } from '@/lib/supabase/types';
 
 export default function CompleteAppointmentDialog({
   appointmentId,
@@ -29,6 +27,7 @@ export default function CompleteAppointmentDialog({
   bookedServiceName,
   defaultAmount,
   depositReceivedAmount,
+  accounts,
   onDone,
 }: {
   appointmentId: string;
@@ -37,12 +36,14 @@ export default function CompleteAppointmentDialog({
   bookedServiceName: string;
   defaultAmount: number;
   depositReceivedAmount?: number | null;
+  /** Cuentas activas (`financial_accounts`), desde el Server Component. */
+  accounts: FinancialAccount[];
   onDone: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [serviceId, setServiceId] = useState(bookedServiceId);
   const [amount, setAmount] = useState(String(defaultAmount || ''));
-  const [paymentMethod, setPaymentMethod] = useState<string>('');
+  const [accountId, setAccountId] = useState<string>('');
   const [rewards, setRewards] = useState<LoyaltyReward[]>([]);
   const [applyReward, setApplyReward] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -58,6 +59,7 @@ export default function CompleteAppointmentDialog({
     if (open) return;
     setServiceId(bookedServiceId);
     setAmount(String(defaultAmount || ''));
+    setAccountId('');
   }, [open, bookedServiceId, defaultAmount]);
 
   /** Si cambió el servicio, el valor cobrado parte del precio del nuevo. */
@@ -75,7 +77,7 @@ export default function CompleteAppointmentDialog({
     startTransition(async () => {
       const result = await completeAppointment(appointmentId, {
         chargedAmount: finalAmount,
-        paymentMethod: paymentMethod || undefined,
+        accountId: accountId || undefined,
         appliedRewardId: applyReward ? reward?.id : undefined,
         serviceId: serviceId !== bookedServiceId ? serviceId : undefined,
       });
@@ -134,21 +136,12 @@ export default function CompleteAppointmentDialog({
               )}
             </div>
 
-            <div className='space-y-2'>
-              <Label>Método de pago</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger>
-                  <SelectValue placeholder='Selecciona uno (opcional)' />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <ChargeAccountSelect
+              id='complete-charge-account'
+              value={accountId}
+              accounts={accounts}
+              onChange={setAccountId}
+            />
 
             {reward && (
               <label className='flex items-start gap-2 text-sm bg-brand-gold/10 border border-brand-gold/30 rounded-md p-3'>

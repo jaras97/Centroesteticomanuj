@@ -94,7 +94,7 @@ function PageLink({
   icon: 'left' | 'right';
 }) {
   const className = cn(
-    'inline-flex h-9 items-center gap-1 rounded-md border px-3 text-sm transition-colors',
+    'inline-flex h-9 items-center gap-1 rounded-md border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal focus-visible:ring-offset-2',
     disabled
       ? 'pointer-events-none border-gray-200 text-gray-300'
       : 'border-input text-brand-ink hover:bg-brand-teal/10',

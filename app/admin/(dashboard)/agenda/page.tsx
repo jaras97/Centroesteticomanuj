@@ -11,6 +11,7 @@ import AgendaCalendar, {
   type AgendaAppointment,
   type AgendaBlockedSlot,
 } from '@/components/admin/agenda-calendar';
+import { listFinancialAccounts } from '@/lib/finance/queries';
 
 function firstDayOfMonth(date: DateStr): DateStr {
   return `${date.slice(0, 7)}-01`;
@@ -44,7 +45,10 @@ export default async function AgendaPage({
 
   const supabase = await createClient();
 
-  const [{ data: appointments }, { data: blockedSlots }] = await Promise.all([
+  // Las cuentas de Finanzas viajan hasta el diálogo de cobro: al completar una
+  // cita hay que poder decir a qué cuenta entró la plata (antes era un texto
+  // libre que no se agregaba en ningún lado).
+  const [{ data: appointments }, { data: blockedSlots }, accounts] = await Promise.all([
     supabase
       .from('appointments')
       .select('*, clients(*), services(*)')
@@ -58,6 +62,7 @@ export default async function AgendaPage({
       .lt('start_at', gridEndUtc.toISOString())
       .gt('end_at', gridStartUtc.toISOString())
       .order('start_at', { ascending: true }),
+    listFinancialAccounts(supabase, true),
   ]);
 
   return (
@@ -73,6 +78,7 @@ export default async function AgendaPage({
         focusedDate={focusedDate}
         appointments={(appointments ?? []) as unknown as AgendaAppointment[]}
         blockedSlots={(blockedSlots ?? []) as AgendaBlockedSlot[]}
+        accounts={accounts}
       />
     </div>
   );

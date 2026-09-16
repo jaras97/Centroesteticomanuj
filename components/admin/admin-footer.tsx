@@ -26,14 +26,14 @@ export default async function AdminFooter() {
 
   return (
     <footer className='mt-12 border-t bg-white'>
-      <div className='max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-sm text-gray-500'>
+      <div className='mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 text-sm text-gray-500'>
         <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
           <div>
             <p className='font-medium text-brand-ink'>
               Centro Estético Manuj{' '}
-              <span className='font-normal text-gray-400'>· Panel administrativo</span>
+              <span className='font-normal text-gray-500'>· Panel administrativo</span>
             </p>
-            <p className='mt-1 text-xs text-gray-400'>
+            <p className='mt-1 text-xs text-gray-500'>
               © {new Date().getFullYear()} · Versión {pkg.version}
             </p>
           </div>

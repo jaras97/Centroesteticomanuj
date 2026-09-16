@@ -14,46 +14,47 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import PerformedServiceSelect from '@/components/admin/performed-service-select';
+import ChargeAccountSelect from '@/components/admin/charge-account-select';
 import { formatCOP } from '@/lib/format';
 import { updateAppointmentCharge } from '@/app/admin/(dashboard)/actions';
-
-const PAYMENT_METHODS = ['Efectivo', 'Transferencia', 'Tarjeta', 'Otro'];
+import type { FinancialAccount } from '@/lib/supabase/types';
 
 /**
- * Corrige una cita ya completada: servicio realizado, valor cobrado y método
- * de pago. Antes esto solo se podía escribir al marcarla como completada, así
- * que un monto mal digitado — o un cambio de servicio que solo se notó al
- * cerrar la cita — quedaba fijo para siempre en Finanzas.
+ * Corrige una cita ya completada: servicio realizado, valor cobrado y cuenta a
+ * la que entró la plata. Antes esto solo se podía escribir al marcarla como
+ * completada, así que un monto mal digitado — o un cambio de servicio que solo
+ * se notó al cerrar la cita — quedaba fijo para siempre en Finanzas.
+ *
+ * Desde la migración 0016 el selector es de **cuenta** (`financial_accounts`),
+ * no de método de pago en texto libre: `payment_method` se sigue escribiendo
+ * con el nombre de la cuenta para no romper el historial anterior.
  */
 export default function EditChargeDialog({
   appointmentId,
   bookedServiceId,
   bookedServiceName,
   currentAmount,
-  currentPaymentMethod,
+  currentAccountId,
   depositReceivedAmount,
+  accounts,
   onDone,
 }: {
   appointmentId: string;
   bookedServiceId: string;
   bookedServiceName: string;
   currentAmount: number | null;
-  currentPaymentMethod: string | null;
+  /** Cuenta ya registrada en la cita, si la tiene (citas previas a 0016 no). */
+  currentAccountId: string | null;
   depositReceivedAmount: number | null;
+  /** Cuentas activas (`financial_accounts`), desde el Server Component. */
+  accounts: FinancialAccount[];
   onDone?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [serviceId, setServiceId] = useState(bookedServiceId);
   const [amount, setAmount] = useState(currentAmount != null ? String(currentAmount) : '');
-  const [paymentMethod, setPaymentMethod] = useState(currentPaymentMethod ?? '');
+  const [accountId, setAccountId] = useState(currentAccountId ?? '');
   const [isPending, startTransition] = useTransition();
 
   // Al reabrir se vuelve a partir de lo que tiene guardado la cita.
@@ -61,8 +62,8 @@ export default function EditChargeDialog({
     if (open) return;
     setServiceId(bookedServiceId);
     setAmount(currentAmount != null ? String(currentAmount) : '');
-    setPaymentMethod(currentPaymentMethod ?? '');
-  }, [open, bookedServiceId, currentAmount, currentPaymentMethod]);
+    setAccountId(currentAccountId ?? '');
+  }, [open, bookedServiceId, currentAmount, currentAccountId]);
 
   const baseAmount = Number(amount) || 0;
 
@@ -70,7 +71,7 @@ export default function EditChargeDialog({
     startTransition(async () => {
       const result = await updateAppointmentCharge(appointmentId, {
         chargedAmount: baseAmount,
-        paymentMethod: paymentMethod || undefined,
+        accountId: accountId || undefined,
         serviceId: serviceId !== bookedServiceId ? serviceId : undefined,
       });
       if (!result.ok) {
@@ -131,21 +132,12 @@ export default function EditChargeDialog({
               )}
             </div>
 
-            <div className='space-y-2'>
-              <Label>Método de pago</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger>
-                  <SelectValue placeholder='Selecciona uno (opcional)' />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <ChargeAccountSelect
+              id='edit-charge-account'
+              value={accountId}
+              accounts={accounts}
+              onChange={setAccountId}
+            />
           </div>
 
           <DialogFooter>
