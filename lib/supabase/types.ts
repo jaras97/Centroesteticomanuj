@@ -66,17 +66,96 @@ export interface Appointment {
   expires_at: string | null;
   deposit_received_amount: number | null;
   charged_amount: number | null;
+  /** Texto libre histórico (0003). Se sigue escribiendo con el nombre de la
+   * cuenta elegida para no romper el historial de citas anterior a 0016. */
   payment_method: string | null;
+  /** Cuenta a la que entró el ingreso de esta cita (0016). null = "Sin asignar". */
+  account_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * @deprecated Tabla muerta desde la migración 0016. Se conserva intacta (los
+ * dos proyectos de Supabase tienen datos reales y la regla es aditiva), pero
+ * ya nadie la lee ni le escribe: sus filas se copiaron a `financial_movements`
+ * con `kind='GASTO'` y `legacy_expense_id`. Todo gasto nuevo va allá.
+ */
 export interface Expense {
   id: string;
   expense_date: string;
   category: string;
   description: string | null;
   amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Finanzas (migración 0016). Ver lib/finance/queries.ts para la agregación.
+// ---------------------------------------------------------------------------
+
+/** Dónde vive la plata. */
+export type FinancialAccountKind = 'EFECTIVO' | 'DIGITAL' | 'BANCO' | 'OTRO';
+
+export interface FinancialAccount {
+  id: string;
+  name: string;
+  kind: FinancialAccountKind;
+  /** Saldo con el que arrancó la cuenta, antes de usar el sistema. */
+  opening_balance: number;
+  display_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** FIJO = se repite mes a mes (arriendo, servicios). VARIABLE = puntual. */
+export type ExpenseNature = 'FIJO' | 'VARIABLE';
+
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  nature: ExpenseNature;
+  display_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * INGRESO_OTRO y GASTO son operativos: entran a la utilidad (P&L).
+ * RETIRO y APORTE NO son operativos: solo mueven la caja. Un retiro no es un
+ * gasto — es utilidad ya ganada que cambia de bolsillo.
+ */
+export type MovementKind = 'INGRESO_OTRO' | 'GASTO' | 'RETIRO' | 'APORTE';
+
+export interface FinancialMovement {
+  id: string;
+  /** 'YYYY-MM-DD'. Es un `date` simple, no un timestamptz: se compara como string. */
+  movement_date: string;
+  kind: MovementKind;
+  amount: number;
+  account_id: string | null;
+  /** Solo tiene sentido en kind='GASTO'; las Server Actions lo limpian en el resto. */
+  category_id: string | null;
+  description: string | null;
+  recurring_template_id: string | null;
+  /** Id de la fila de `expenses` de la que salió este movimiento en el backfill de 0016. */
+  legacy_expense_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecurringExpense {
+  id: string;
+  name: string;
+  category_id: string | null;
+  account_id: string | null;
+  amount: number;
+  /** 1-28, para que la plantilla exista en todos los meses (febrero incluido). */
+  day_of_month: number;
+  active: boolean;
   created_at: string;
   updated_at: string;
 }

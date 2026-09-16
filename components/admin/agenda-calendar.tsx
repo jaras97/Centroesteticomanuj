@@ -20,6 +20,7 @@ import {
   toBogotaWallClock,
   type DateStr,
 } from '@/lib/booking/timezone';
+import type { FinancialAccount } from '@/lib/supabase/types';
 import './agenda-calendar.css';
 
 export interface AgendaAppointment {
@@ -44,11 +45,26 @@ export interface AgendaBlockedSlot {
   reason: string | null;
 }
 
-const STATUS_COLOR: Record<AgendaAppointment['status'], string> = {
-  SOLICITADA: '#d97706', // amber-600
-  ESPERANDO_ANTICIPO: '#B79A80', // brand.sand-dark
-  CONFIRMADA: '#739DAA', // brand.teal
-  COMPLETADA: '#059669', // emerald-600
+/**
+ * Color de cada estado, como clase CSS en vez de como color resuelto.
+ *
+ * Si se usan `backgroundColor`/`borderColor`, FullCalendar exige un color ya
+ * resuelto (lo escribe como estilo inline), y eso dejaba `brand.sand-dark` y
+ * `brand.teal` congelados como hex literales: cuando Manu cambia la paleta en
+ * /admin/contenido → Sitio, la agenda seguía pintando los eventos con los
+ * colores viejos. Con `classNames` el color vive en agenda-calendar.css, donde
+ * `theme('colors.brand.*')` resuelve a `hsl(var(--brand-*))` y se re-tematiza
+ * solo con el <style> que inyecta app/layout.tsx — sin JavaScript, sin render
+ * extra y sin parpadeo. Cada clase redefine `--fc-event-bg-color` /
+ * `--fc-event-border-color` sobre el propio elemento del evento, que es de
+ * donde los leen tanto el bloque de las vistas Semana/Día como el puntito de
+ * la vista Mes.
+ */
+const STATUS_CLASS: Record<AgendaAppointment['status'], string> = {
+  SOLICITADA: 'agenda-evento-solicitada',
+  ESPERANDO_ANTICIPO: 'agenda-evento-esperando-anticipo',
+  CONFIRMADA: 'agenda-evento-confirmada',
+  COMPLETADA: 'agenda-evento-completada',
 };
 
 const DENSITIES = ['compacta', 'media', 'amplia'] as const;
@@ -132,11 +148,15 @@ export default function AgendaCalendar({
   focusedDate,
   appointments,
   blockedSlots,
+  accounts,
 }: {
   monday: string;
   focusedDate: string;
   appointments: AgendaAppointment[];
   blockedSlots: AgendaBlockedSlot[];
+  /** Cuentas activas de Finanzas; el diálogo de cobro las necesita para saber
+   *  a dónde entró la plata. Viajan por props desde el Server Component. */
+  accounts: FinancialAccount[];
 }) {
   const prevWeek = addDaysToDateStr(monday, -7);
   const nextWeek = addDaysToDateStr(monday, 7);
@@ -163,8 +183,7 @@ export default function AgendaCalendar({
       start: toFakeUtcIso(appointment.start_time),
       end: toFakeUtcIso(appointment.end_time),
       title: `${appointment.deposit_received_amount ? '💰 ' : ''}${appointment.clients.name} · ${appointment.services.name}`,
-      backgroundColor: STATUS_COLOR[appointment.status],
-      borderColor: STATUS_COLOR[appointment.status],
+      classNames: [STATUS_CLASS[appointment.status]],
       extendedProps: { kind: 'appointment', appointment },
     }));
 
@@ -173,8 +192,7 @@ export default function AgendaCalendar({
       start: toFakeUtcIso(block.start_at),
       end: toFakeUtcIso(block.end_at),
       title: block.reason ? `Bloqueado: ${block.reason}` : 'Bloqueado',
-      backgroundColor: '#9ca3af',
-      borderColor: '#9ca3af',
+      classNames: ['agenda-evento-bloqueado'],
       editable: false,
       extendedProps: { kind: 'blocked', block },
     }));
@@ -267,17 +285,20 @@ export default function AgendaCalendar({
     <div>
       <div className='flex items-center justify-between mb-6 gap-3 flex-wrap'>
         <div className='flex items-center gap-2'>
-          <Link href={`/admin/agenda?date=${prevHref}`}>
-            <Button variant='outline' size='icon'>
+          {/* `asChild`: el enlace ES el botón. Un <button> dentro de un <a>
+              es HTML inválido y deja dos paradas de teclado, la segunda sin
+              nombre accesible. */}
+          <Button asChild variant='outline' size='icon'>
+            <Link href={`/admin/agenda?date=${prevHref}`} aria-label='Periodo anterior'>
               <ChevronLeft className='h-4 w-4' />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
           <span className='text-sm font-medium text-brand-ink capitalize'>{headerLabel}</span>
-          <Link href={`/admin/agenda?date=${nextHref}`}>
-            <Button variant='outline' size='icon'>
+          <Button asChild variant='outline' size='icon'>
+            <Link href={`/admin/agenda?date=${nextHref}`} aria-label='Periodo siguiente'>
               <ChevronRight className='h-4 w-4' />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
 
         <div className='flex items-center gap-3 flex-wrap'>
@@ -286,8 +307,9 @@ export default function AgendaCalendar({
               <button
                 key={v}
                 type='button'
+                aria-pressed={view === v}
                 onClick={() => changeView(v)}
-                className={`rounded px-2.5 py-1 transition-colors ${
+                className={`rounded px-2.5 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal ${
                   view === v ? 'bg-brand-teal text-white' : 'text-gray-500 hover:text-brand-ink'
                 }`}
               >
@@ -350,6 +372,7 @@ export default function AgendaCalendar({
 
       <AgendaEventDialog
         event={selectedEvent}
+        accounts={accounts}
         onOpenChange={(open) => {
           if (!open) setSelectedEvent(null);
         }}

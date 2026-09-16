@@ -20,6 +20,7 @@ import {
   type AppointmentDetail as AppointmentDetailData,
 } from '@/app/admin/(dashboard)/actions';
 import type { AgendaAppointment, AgendaBlockedSlot } from '@/components/admin/agenda-calendar';
+import type { FinancialAccount } from '@/lib/supabase/types';
 
 export type SelectedAgendaEvent =
   | { kind: 'appointment'; data: AgendaAppointment; isPast: boolean }
@@ -44,9 +45,12 @@ const STATUS_VARIANT: Record<
 
 export default function AgendaEventDialog({
   event,
+  accounts,
   onOpenChange,
 }: {
   event: SelectedAgendaEvent | null;
+  /** Cuentas activas de Finanzas, para el selector de los diálogos de cobro. */
+  accounts: FinancialAccount[];
   onOpenChange: (open: boolean) => void;
 }) {
   const [lastEvent, setLastEvent] = useState<SelectedAgendaEvent | null>(null);
@@ -64,6 +68,7 @@ export default function AgendaEventDialog({
           <AppointmentDetail
             appointment={shown.data}
             isPast={shown.isPast}
+            accounts={accounts}
             onDone={() => onOpenChange(false)}
           />
         )}
@@ -104,10 +109,12 @@ function DetailRow({
 function AppointmentDetail({
   appointment,
   isPast,
+  accounts,
   onDone,
 }: {
   appointment: AgendaAppointment;
   isPast: boolean;
+  accounts: FinancialAccount[];
   onDone: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -260,6 +267,7 @@ function AppointmentDetail({
               bookedServiceName={detail?.service.name ?? appointment.services.name}
               defaultAmount={listPrice ?? 0}
               depositReceivedAmount={appointment.deposit_received_amount}
+              accounts={accounts}
               onDone={onDone}
             />
             <Button
@@ -287,8 +295,9 @@ function AppointmentDetail({
             bookedServiceId={appointment.service_id}
             bookedServiceName={detail?.service.name ?? appointment.services.name}
             currentAmount={charged}
-            currentPaymentMethod={paymentMethod}
+            currentAccountId={detail?.account_id ?? null}
             depositReceivedAmount={deposit}
+            accounts={accounts}
             onDone={onDone}
           />
         )}

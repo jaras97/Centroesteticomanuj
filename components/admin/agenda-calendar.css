@@ -90,3 +90,44 @@
   min-height: 5rem;
   cursor: pointer;
 }
+
+/* Colores de los eventos.
+ *
+ * Se aplican por clase (ver STATUS_CLASS en agenda-calendar.tsx) y no con las
+ * props `backgroundColor`/`borderColor` de FullCalendar, que exigen un color ya
+ * resuelto y dejaban los tonos de marca congelados como hex literales, sordos al
+ * theming de /admin/contenido → Sitio. Acá `theme('colors.brand.*')` compila a
+ * `hsl(var(--brand-*))`, así que el <style> que inyecta app/layout.tsx cuando
+ * site_settings trae colores propios los repinta solo, sin JavaScript.
+ *
+ * Redefinir las dos variables que ya usa FullCalendar (en vez de escribir
+ * `background-color` a mano) cubre de una sola vez el bloque de las vistas
+ * Semana/Día (`.fc-v-event`) y el puntito de la vista Mes
+ * (`.fc-daygrid-event-dot`), que las heredan del elemento del evento.
+ *
+ * Ámbar, esmeralda y gris no son colores de marca: son tonos semánticos de la
+ * paleta de Tailwind y no deben seguir al theming. */
+.agenda-fc .agenda-evento-solicitada {
+  --fc-event-bg-color: theme('colors.amber.600');
+  --fc-event-border-color: theme('colors.amber.600');
+}
+
+.agenda-fc .agenda-evento-esperando-anticipo {
+  --fc-event-bg-color: theme('colors.brand.sand-dark');
+  --fc-event-border-color: theme('colors.brand.sand-dark');
+}
+
+.agenda-fc .agenda-evento-confirmada {
+  --fc-event-bg-color: theme('colors.brand.teal');
+  --fc-event-border-color: theme('colors.brand.teal');
+}
+
+.agenda-fc .agenda-evento-completada {
+  --fc-event-bg-color: theme('colors.emerald.600');
+  --fc-event-border-color: theme('colors.emerald.600');
+}
+
+.agenda-fc .agenda-evento-bloqueado {
+  --fc-event-bg-color: theme('colors.gray.400');
+  --fc-event-border-color: theme('colors.gray.400');
+}
