@@ -32,7 +32,7 @@ Un solo admin autenticado (Supabase Auth, sin roles) tiene acceso total a los tr
 | `/admin/finanzas` | **Finanzas** — 4 pestañas (`?tab=`): Resumen, Movimientos, Gastos fijos, Cuentas. Mes por `?month=YYYY-MM`. Ver "Finanzas" abajo |
 | `/admin/clientes` | Listado (buscador + paginación de 25) y ficha de cliente (historial, fidelización, preferencia de marketing) |
 | `/admin/contenido` | **CMS** — 6 pestañas: Carrusel, Servicios (categorías), Galería, Promociones, Secciones, Sitio |
-| `/admin/notificaciones` | **Notificaciones** — 3 pestañas: Plantillas (+ configuración), Pendientes de WhatsApp, Historial. Ver `docs/PRD-notificaciones.md` |
+| `/admin/notificaciones` | **Notificaciones** — 4 pestañas: Plantillas (+ configuración), Pendientes de WhatsApp, **Campañas**, Historial. Ver `docs/PRD-notificaciones.md` y `docs/HANDOFF-campanas-y-trazabilidad.md` |
 | `/admin/login` | Login (Supabase Auth email/password) |
 
 ### API HTTP (única excepción al patrón de Server Actions)
@@ -85,6 +85,27 @@ Columnas: `id, kind, title, body, media_type ('image'|'video'|'color'), image_ur
 `id (boolean pk), admin_email, admin_whatsapp, business_name, reminder_hours_before (1-168), birthday_send_day (1-28), updated_at`. `admin_email`/`admin_whatsapp` en `null` caen a `site_settings.email`/`whatsapp_number`.
 
 Además, `clients.marketing_opt_out boolean default false`: el saludo de cumpleaños es marketing (Ley 1581 de 2012) y lo respeta; solicitud y recordatorio son transaccionales y no dependen de esa bandera.
+
+### Campañas (migración 0017 — ver `docs/HANDOFF-campanas-y-trazabilidad.md`)
+
+**`campaigns`** — una promoción con flyer que se le manda a un grupo de clientas.
+`id, title (nombre interno), subject, body, flyer_image_url, channels text[], audience jsonb, status ('BORRADOR'|'ENVIADA'), sent_at, recipient_count, created_at, updated_at`.
+
+Cada destinataria se encola como **una fila del outbox** (`notifications`) con `event='campaign'` y `campaign_id`: así hereda el despachador, el `dedupe_key` (`campaign:{campaignId}:{clientId}:{channel}`), el claim atómico y el historial. El correo sale solo con el flyer embebido; el WhatsApp queda en la bandeja asistida con el **link público** del flyer, porque un deep link `wa.me` no puede adjuntar imágenes.
+
+`0017` amplía el `check` de `event` en `notifications` y `notification_templates` para admitir `'campaign'`. Es el único paso no estrictamente aditivo del proyecto: recrea dos constraints. El bloque `do $$` las busca **por definición y no por nombre** — `0014` las declaró inline y Postgres las bautiza solo, así que pueden llamarse distinto en cada base.
+
+**Audiencia** (`audience` jsonb): `{"kind":"all"}`, `{"kind":"birthday_month","month":N}`, `{"kind":"inactive","months":N}`, `{"kind":"new","months":N}`, `{"kind":"manual","clientIds":[…]}`. Se resuelve con funciones SQL y no en TypeScript, por `max_rows` (mismo motivo que las funciones de Finanzas):
+
+| Función | Esquema | Para qué |
+|---|---|---|
+| `campaign_audience_raw` | **`private`** | Núcleo compartido; devuelve también a las opt-out, con la bandera a la vista |
+| `campaign_audience` | `public` | Destinatarias reales, ya sin opt-out. **Única puerta para encolar** |
+| `campaign_audience_stats` | `public` | Una fila con los 4 conteos, inmune a `max_rows` |
+
+> **Ley 1581 — no tocar sin entender esto.** Una campaña es marketing. El filtro de `clients.marketing_opt_out` vive **dentro de `campaign_audience`**, no en el llamador, y aplica a **todos** los segmentos **incluido `manual`**: si Manu elige a mano a alguien que pidió no recibir promociones, no entra igual. `campaign_audience_raw` está en el esquema `private` justamente para que PostgREST no lo exponga y nadie pueda obtener por error la lista *con* las opt-out. La línea de baja va en los dos canales, siempre. Las transaccionales (solicitud, recordatorio) **no** dependen del opt-out y deben seguir saliendo siempre.
+
+**Trazabilidad del outbox**: desde esta sesión, cuando falta el destinatario (sin correo o sin teléfono) la fila **se encola igual con `status='OMITIDO'`** y el motivo en `error`, en vez de descartarse en silencio. Antes, `enqueue` devolvía `[]` y la ausencia era invisible: en producción el outbox tenía 2 filas y ningún correo, porque 40 de 59 clientas no tienen correo cargado. Lo que sí se sigue descartando en silencio es la plantilla apagada (es una decisión deliberada de Manu). `retryNotification` re-resuelve el correo/teléfono contra la ficha antes de reintentar.
 
 ### Vista `clients_with_stats` (migración 0013)
 
@@ -146,7 +167,7 @@ Un retiro **no es un gasto**: es utilidad ya ganada que cambia de bolsillo. Ese 
 ### RLS de las tablas de contenido
 Todas siguen el mismo patrón: `admin_full_access` (`for all to authenticated using (true) with check (true)`) + `public_read_active` (`for select to anon, authenticated using (active = true)`, con la condición extra de ventana de fechas en `promotions`). Es una excepción deliberada al patrón del resto de la app (donde el público nunca lee con la anon key) — es contenido de marketing de solo lectura, sin lógica sensible que proteger. `site_settings` no tiene condición `active` (es la única fila, siempre aplica).
 
-Las tres tablas de notificaciones **no** son contenido público: llevan solo `admin_full_access`, sin `public_read_active`. El cron las lee con el cliente `service_role`, que bypassa RLS.
+Las tablas de notificaciones y `campaigns` **no** son contenido público: llevan solo `admin_full_access`, sin `public_read_active`. El cron las lee con el cliente `service_role`, que bypassa RLS.
 
 Las cuatro tablas de Finanzas tampoco: solo `admin_full_access`. Son datos financieros y **nunca** deben recibir una política de lectura para `anon`.
 
@@ -186,6 +207,9 @@ Todas revalidan `/admin/finanzas`.
 - **Gastos fijos**: `createRecurringExpense`, `updateRecurringExpense`, `setRecurringExpenseActive`, `deleteRecurringExpense` (**acá sí hay borrado duro**: una plantilla es una conveniencia, no un dato contable, y sus movimientos sobreviven vía `on delete set null`), `registerRecurringExpense(templateId, month)` — materializa el gasto de una plantilla en un mes. El chequeo de duplicados es por consulta, no por índice único: el mismo fijo podría legítimamente pagarse dos veces en un mes por un ajuste.
 
 **`createExpense` / `updateExpense` / `deleteExpense` fueron ELIMINADAS** junto con su UI (`expenses-table.tsx`, `expense-form-dialog.tsx`). Un export de un archivo `'use server'` es un endpoint público y no tiene sentido mantener tres que nadie llama. Todo gasto nuevo entra por `createFinancialMovement` con `kind='GASTO'`.
+
+### Campañas (`campaigns`)
+`createCampaign`, `updateCampaign`, `deleteCampaign` (las tres solo sobre BORRADOR — una ENVIADA es histórico y solo se puede **duplicar**), `previewCampaignAudience(audience)` → `{total, reachableByEmail, reachableByWhatsapp, excludedByOptOut}` (el alcance real **antes** de enviar), `sendCampaign(id)` → encola, marca ENVIADA y despacha. El flyer se sube con `uploadSiteMedia('campaigns', …)`, que rechaza video y **SVG** (ningún cliente de correo renderiza SVG en un `<img>`).
 
 ### Notificaciones (`notification_templates`, `notification_settings`, `notifications`)
 `updateNotificationTemplate(id, {subject, body})`, `setNotificationTemplateEnabled(id, enabled)`, `updateNotificationSettings(input)`, `markWhatsAppNotificationSent(id)` (bandeja asistida: Manu manda el mensaje por `wa.me` y lo cierra acá), `skipWhatsAppNotification(id)`, `retryNotification(id)` (vuelve a `PENDIENTE` y despacha), `sendTestNotificationEmail(templateId, toOverride?)` (correo de prueba con valores de ejemplo), `setClientMarketingOptOut(clientId, optOut)`.
@@ -310,7 +334,8 @@ El trade-off: si alguien cambia los colores de marca desde `/admin/contenido` �
 | 0013 | Búsqueda y paginación de clientes: `pg_trgm` + índices, vista `clients_with_stats` (`security_invoker`) |
 | 0014 | Notificaciones: `clients.marketing_opt_out`, `notification_templates` (+seed de plantillas), `notification_settings` (singleton), `notifications` (outbox) |
 | 0015 | `notification_settings.email_logo_url` — logo PNG de la cabecera de los correos (el del sitio es SVG y los clientes de correo no lo renderizan) |
-| 0016 | **Finanzas**: `financial_accounts`, `expense_categories`, `financial_movements`, `recurring_expenses`, `appointments.account_id` (+backfill por nombre contra `payment_method`) y backfill de `expenses` → `financial_movements` (`legacy_expense_id`). Deja `expenses` muerta. **SIN CORRER en ningún proyecto** |
+| 0016 | **Finanzas**: `financial_accounts`, `expense_categories`, `financial_movements`, `recurring_expenses`, `appointments.account_id` (+backfill por nombre contra `payment_method`) y backfill de `expenses` → `financial_movements` (`legacy_expense_id`). Deja `expenses` muerta. Más las 3 funciones de agregación de la sección 7 |
+| 0017 | **Campañas**: `campaigns`, `notifications.campaign_id`, evento `'campaign'` (recrea el `check` de `event` en dos tablas), esquema `private` y las 3 funciones de audiencia. **SIN CORRER en ningún proyecto** |
 
 Todas aditivas desde la 0002 (no hacen `drop`). Se corren a mano en el SQL Editor de Supabase Studio — no hay CLI/CI conectado a este proyecto de Supabase desde este entorno de desarrollo (ver `docs/HANDOFF-cms-contenido-fase-1.md`, sección de por qué).
 
@@ -347,4 +372,4 @@ Consecuencias prácticas, todas aprendidas a golpes:
 > Ni dev ni producción la tienen. Sin ella, `/admin/finanzas` falla entera: las cuatro tablas y `appointments.account_id` no existen. **Es lo primero que hay que hacer antes de probar cualquier cosa de Finanzas**, y hay que correrla **dos veces, una por proyecto** (ver el checklist de `docs/HANDOFF-finanzas-y-navegacion.md`).
 
 - **Dev** (`rtmuaeonmqadbezygfrv`): migraciones **0001-0015** corridas. **`0016` pendiente.** Contenido real cargado, Manu usando el CMS activamente.
-- **Producción** (`rlpwmheokkrttxyfusyp`): desplegada en `centroesteticomanuj.com`, migraciones **0001-0015** corridas, **`0016` pendiente**. Notificaciones configuradas y verificadas con un envío real.
+- **Producción** (`rlpwmheokkrttxyfusyp`): desplegada en `centroesteticomanuj.com`, migraciones **0001-0016** corridas, **`0017` pendiente**. Notificaciones configuradas, pero **nunca se ha enviado un correo real desde el outbox** (ver el handoff de campañas: hasta ahora el outbox solo tenía filas de WhatsApp, porque las clientas de esas notificaciones no tenían correo cargado).

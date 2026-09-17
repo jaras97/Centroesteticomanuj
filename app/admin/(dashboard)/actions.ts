@@ -7,6 +7,23 @@ import { bogotaWallTimeToUtc } from '@/lib/booking/timezone';
 import { dispatchQuietly } from '@/lib/notifications/dispatch';
 import { emailConfigurationIssue, sendRawEmail } from '@/lib/notifications/channels/email';
 import { PREVIEW_VARS, renderTemplate } from '@/lib/notifications/templates';
+import {
+  enqueueCampaign,
+  loadNotificationContext,
+  missingRecipientReason,
+} from '@/lib/notifications/enqueue';
+import {
+  CampaignAudienceError,
+  INVALID_AUDIENCE_ERROR,
+  getCampaignAudienceStats,
+  parseCampaignAudience,
+  resolveCampaignAudience,
+} from '@/lib/notifications/audience';
+import type {
+  Campaign,
+  CampaignAudience,
+  NotificationChannel,
+} from '@/lib/notifications/types';
 import type {
   ExpenseNature,
   FinancialAccountKind,
@@ -872,7 +889,7 @@ function revalidateContenido() {
 const MAX_VIDEO_BYTES = 15 * 1024 * 1024; // 15MB — clips cortos, no video largo
 
 export async function uploadSiteMedia(
-  folder: 'hero' | 'services' | 'gallery' | 'promos' | 'site',
+  folder: 'hero' | 'services' | 'gallery' | 'promos' | 'site' | 'campaigns',
   formData: FormData,
 ) {
   const supabase = await requireUser();
@@ -889,6 +906,23 @@ export async function uploadSiteMedia(
   }
   if (isVideo && file.size > MAX_VIDEO_BYTES) {
     return { ok: false as const, error: 'El video no puede pesar más de 15MB — usa un clip corto.' };
+  }
+
+  // El flyer de una campaña se embebe en un correo: ahí no sirve ni un video
+  // ni un SVG (ningún cliente de correo mayoritario renderiza SVG dentro de
+  // un <img> — Gmail y Outlook lo bloquean). Se ataja al subir, que es donde
+  // se puede explicar, y no al enviar, que es tarde.
+  if (folder === 'campaigns') {
+    if (!isImage) {
+      return { ok: false as const, error: 'El flyer debe ser una imagen PNG o JPG.' };
+    }
+    if (file.type === 'image/svg+xml' || /\.svg$/i.test(file.name)) {
+      return {
+        ok: false as const,
+        error:
+          'Los correos no muestran SVG (Gmail y Outlook lo bloquean). Sube el flyer en PNG o JPG.',
+      };
+    }
   }
 
   const ext = file.name.split('.').pop()?.toLowerCase() || (isVideo ? 'mp4' : 'jpg');
@@ -2084,15 +2118,76 @@ export async function skipWhatsAppNotification(id: string) {
   return { ok: true };
 }
 
-/** Vuelve a poner una notificación FALLIDO/OMITIDO en la cola y la despacha. */
+/**
+ * Vuelve a poner una notificación FALLIDO/OMITIDO en la cola y la despacha.
+ *
+ * Hace dos cosas más que un simple `update status='PENDIENTE'`, y las dos
+ * nacen de que ahora existen filas OMITIDO por falta de destinatario:
+ *
+ * 1. RE-RESUELVE el correo/teléfono contra la ficha de la clienta. El caso
+ *    típico es justamente ese: la notificación quedó OMITIDA porque la
+ *    clienta no tenía correo, Manu se lo pidió por WhatsApp, lo cargó en la
+ *    ficha y ahora reintenta. Sin esto, la fila seguiría con `to_email` en
+ *    null y volvería a omitirse para siempre. Solo aplica a los mensajes
+ *    `recipient_kind = 'client'`: en los internos el `client_id` apunta a la
+ *    clienta de la cita, y copiarle su correo a Manu sería mandarle el aviso
+ *    interno a la persona equivocada.
+ *
+ * 2. Si SIGUE sin destinatario, la deja OMITIDA con el mismo motivo en vez de
+ *    dejarla colgada en PENDIENTE. Es importante en WhatsApp: el despachador
+ *    no mira ese canal (`sendsAutomatically = false`), así que una fila
+ *    PENDIENTE sin teléfono se quedaría para siempre en la bandeja asistida
+ *    con un botón de wa.me que no lleva a ningún lado.
+ */
 export async function retryNotification(id: string) {
   const supabase = await requireUser();
+
+  const { data: notification } = await supabase
+    .from('notifications')
+    .select('id, channel, recipient_kind, client_id, to_email, to_phone')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!notification) return { ok: false, error: 'No se encontró la notificación.' };
+
+  let toEmail: string | null = notification.to_email;
+  let toPhone: string | null = notification.to_phone;
+
+  if (notification.recipient_kind === 'client' && notification.client_id && (!toEmail || !toPhone)) {
+    const { data: client } = await supabase
+      .from('clients')
+      .select('email, phone')
+      .eq('id', notification.client_id)
+      .maybeSingle();
+
+    toEmail = toEmail || client?.email?.trim() || null;
+    toPhone = toPhone || client?.phone?.trim() || null;
+  }
+
+  const missing = missingRecipientReason(
+    notification.channel,
+    notification.recipient_kind,
+    toEmail,
+    toPhone,
+  );
+
+  if (missing) {
+    await supabase
+      .from('notifications')
+      .update({ status: 'OMITIDO', error: missing })
+      .eq('id', id);
+
+    revalidateNotificaciones();
+    return { ok: false, error: `No se puede reintentar: ${missing}` };
+  }
 
   const { error } = await supabase
     .from('notifications')
     .update({
       status: 'PENDIENTE',
       scheduled_for: new Date().toISOString(),
+      to_email: toEmail,
+      to_phone: toPhone,
       error: null,
     })
     .eq('id', id);
@@ -2179,4 +2274,287 @@ export async function setClientMarketingOptOut(clientId: string, optOut: boolean
   revalidatePath('/admin/clientes');
   revalidatePath(`/admin/clientes/${clientId}`);
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Campañas (/admin/notificaciones → Campañas) — migración 0017
+// ---------------------------------------------------------------------------
+// Una campaña es una promoción con flyer que Manu le manda a un segmento de
+// clientas. NO inventa un mecanismo de envío nuevo: encola una fila por
+// destinataria en el mismo outbox de siempre (`notifications`, con
+// `event='campaign'` y `campaign_id`), así que hereda el despachador, el
+// claim atómico, el `dedupe_key` y el historial.
+//
+// El correo lleva el flyer EMBEBIDO; WhatsApp lleva texto + el link público
+// al flyer, porque un deep link `wa.me` no puede adjuntar imágenes (WhatsApp
+// arma la vista previa del link solo). El envío de WhatsApp sigue siendo
+// asistido, como todo el WhatsApp del proyecto.
+//
+// Es MARKETING (Ley 1581 de 2012): la audiencia excluye siempre a quien tenga
+// `marketing_opt_out`, y el mensaje lleva línea de baja en los dos canales.
+
+export interface CampaignInput {
+  title: string;
+  subject: string | null;
+  body: string;
+  flyerImageUrl: string | null;
+  channels: NotificationChannel[];
+  audience: CampaignAudience;
+}
+
+const CAMPAIGN_CHANNELS: NotificationChannel[] = ['email', 'whatsapp'];
+
+/**
+ * Valida el flyer. Se hace tres veces (al subir, al guardar y al enviar) a
+ * propósito: la URL también se puede pegar a mano, y mandar 60 correos con
+ * una imagen que no se ve no tiene vuelta atrás.
+ */
+function validateFlyerUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (!/^https:\/\//i.test(url)) return 'El flyer debe ser una URL https.';
+  if (/\.svg(\?|#|$)/i.test(url)) {
+    return 'Los correos no muestran SVG (Gmail y Outlook lo bloquean). Sube el flyer en PNG o JPG.';
+  }
+  return null;
+}
+
+/** Validación común de crear y editar. Devuelve el error en español, o `null`. */
+function validateCampaignInput(input: CampaignInput): string | null {
+  if (!input.title.trim()) return 'Ponle un nombre a la campaña.';
+  if (!input.body.trim()) return 'El mensaje no puede quedar vacío.';
+
+  const channels = input.channels.filter((c) => CAMPAIGN_CHANNELS.includes(c));
+  if (channels.length === 0) return 'Elige al menos un canal (correo o WhatsApp).';
+  if (channels.includes('email') && !input.subject?.trim()) {
+    return 'El correo necesita un asunto.';
+  }
+
+  const flyerIssue = validateFlyerUrl(input.flyerImageUrl?.trim() || null);
+  if (flyerIssue) return flyerIssue;
+
+  if (!parseCampaignAudience(input.audience)) return INVALID_AUDIENCE_ERROR;
+
+  return null;
+}
+
+function campaignDbFields(input: CampaignInput) {
+  return {
+    title: input.title.trim(),
+    subject: input.subject?.trim() || null,
+    body: input.body.trim(),
+    flyer_image_url: input.flyerImageUrl?.trim() || null,
+    // Se normaliza el orden y se quitan repetidos: `channels` es un conjunto.
+    channels: CAMPAIGN_CHANNELS.filter((c) => input.channels.includes(c)),
+    audience: parseCampaignAudience(input.audience),
+  };
+}
+
+export async function createCampaign(input: CampaignInput) {
+  const supabase = await requireUser();
+
+  const issue = validateCampaignInput(input);
+  if (issue) return { ok: false as const, error: issue };
+
+  const { data, error } = await supabase
+    .from('campaigns')
+    .insert({ ...campaignDbFields(input), status: 'BORRADOR' })
+    .select('id')
+    .maybeSingle();
+
+  if (error || !data) return { ok: false as const, error: 'No se pudo crear la campaña.' };
+
+  revalidateNotificaciones();
+  return { ok: true as const, id: data.id as string };
+}
+
+/** Solo se edita un BORRADOR: una campaña ENVIADA es histórico de lo que salió. */
+export async function updateCampaign(id: string, input: CampaignInput) {
+  const supabase = await requireUser();
+
+  const issue = validateCampaignInput(input);
+  if (issue) return { ok: false as const, error: issue };
+
+  const { data, error } = await supabase
+    .from('campaigns')
+    .update(campaignDbFields(input))
+    .eq('id', id)
+    .eq('status', 'BORRADOR')
+    .select('id')
+    .maybeSingle();
+
+  if (error) return { ok: false as const, error: 'No se pudo guardar la campaña.' };
+  if (!data) {
+    return {
+      ok: false as const,
+      error: 'Esta campaña ya se envió: no se puede editar lo que las clientas recibieron.',
+    };
+  }
+
+  revalidateNotificaciones();
+  return { ok: true as const };
+}
+
+/** Borra un BORRADOR. Una campaña ENVIADA no se borra: es el historial. */
+export async function deleteCampaign(id: string) {
+  const supabase = await requireUser();
+
+  const { data, error } = await supabase
+    .from('campaigns')
+    .delete()
+    .eq('id', id)
+    .eq('status', 'BORRADOR')
+    .select('id')
+    .maybeSingle();
+
+  if (error) return { ok: false as const, error: 'No se pudo eliminar la campaña.' };
+  if (!data) {
+    return {
+      ok: false as const,
+      error: 'Una campaña ya enviada no se elimina: queda como historial.',
+    };
+  }
+
+  revalidateNotificaciones();
+  return { ok: true as const };
+}
+
+/**
+ * Alcance del segmento ANTES de enviar. La UI lo muestra al elegir la
+ * audiencia: con 40 de 59 clientas sin correo, `reachableByEmail` es la
+ * diferencia entre una expectativa y una decepción.
+ */
+export async function previewCampaignAudience(audience: CampaignAudience) {
+  const supabase = await requireUser();
+
+  const parsed = parseCampaignAudience(audience);
+  if (!parsed) return { ok: false as const, error: INVALID_AUDIENCE_ERROR };
+
+  try {
+    const stats = await getCampaignAudienceStats(supabase, parsed);
+    return { ok: true as const, ...stats };
+  } catch (err) {
+    return {
+      ok: false as const,
+      error:
+        err instanceof CampaignAudienceError
+          ? err.message
+          : 'No se pudo calcular el alcance de la campaña.',
+    };
+  }
+}
+
+/**
+ * Resuelve la audiencia, encola un mensaje por destinataria y canal, y marca
+ * la campaña como ENVIADA.
+ *
+ * DOS PROTECCIONES CONTRA EL DOBLE ENVÍO, y hacen falta las dos:
+ *   · El claim atómico `update ... where status='BORRADOR' returning`, igual
+ *     que el del despachador. Dos clics seguidos en "Enviar" son dos
+ *     ejecuciones en paralelo: la segunda no encuentra el BORRADOR y se cae
+ *     acá, antes de encolar nada.
+ *   · El índice único sobre `dedupe_key` (`campaign:<id>:<clienta>:<canal>`),
+ *     que ataja cualquier otro camino.
+ * Si el encolado falla, la campaña vuelve a BORRADOR: quedaría marcada como
+ * enviada sin haberle escrito a nadie.
+ */
+export async function sendCampaign(campaignId: string) {
+  const supabase = await requireUser();
+
+  const { data: campaignRow } = await supabase
+    .from('campaigns')
+    .select('*')
+    .eq('id', campaignId)
+    .maybeSingle();
+
+  if (!campaignRow) return { ok: false as const, error: 'No se encontró la campaña.' };
+
+  const campaign = campaignRow as Campaign;
+
+  if (campaign.status === 'ENVIADA') {
+    return {
+      ok: false as const,
+      error: 'Esta campaña ya se envió. Duplica la campaña si quieres volver a mandarla.',
+    };
+  }
+
+  const issue = validateCampaignInput({
+    title: campaign.title,
+    subject: campaign.subject,
+    body: campaign.body,
+    flyerImageUrl: campaign.flyer_image_url,
+    channels: campaign.channels ?? [],
+    audience: campaign.audience,
+  });
+  if (issue) return { ok: false as const, error: issue };
+
+  const audience = parseCampaignAudience(campaign.audience);
+  if (!audience) return { ok: false as const, error: INVALID_AUDIENCE_ERROR };
+
+  let recipients;
+  try {
+    recipients = await resolveCampaignAudience(supabase, audience);
+  } catch (err) {
+    return {
+      ok: false as const,
+      error:
+        err instanceof CampaignAudienceError
+          ? err.message
+          : 'No se pudieron resolver las destinatarias.',
+    };
+  }
+
+  if (recipients.length === 0) {
+    return {
+      ok: false as const,
+      error:
+        'No hay ninguna destinataria en este segmento (recuerda que se excluye a quienes pidieron no recibir promociones).',
+    };
+  }
+
+  // Claim atómico: quien se lleva el BORRADOR es quien envía.
+  const { data: claimed, error: claimError } = await supabase
+    .from('campaigns')
+    .update({ status: 'ENVIADA', sent_at: new Date().toISOString() })
+    .eq('id', campaignId)
+    .eq('status', 'BORRADOR')
+    .select('id')
+    .maybeSingle();
+
+  if (claimError) return { ok: false as const, error: 'No se pudo enviar la campaña.' };
+  if (!claimed) {
+    return { ok: false as const, error: 'Esta campaña ya se está enviando o ya se envió.' };
+  }
+
+  const context = await loadNotificationContext(supabase);
+  const result = await enqueueCampaign(supabase, context, campaign, recipients);
+
+  if (!result.ok) {
+    await supabase
+      .from('campaigns')
+      .update({ status: 'BORRADOR', sent_at: null })
+      .eq('id', campaignId);
+
+    return {
+      ok: false as const,
+      error: 'No se pudieron encolar los mensajes. La campaña sigue en borrador.',
+    };
+  }
+
+  await supabase
+    .from('campaigns')
+    .update({ recipient_count: result.recipients })
+    .eq('id', campaignId);
+
+  // Los correos salen por el despachador; los de WhatsApp se quedan
+  // PENDIENTE en la bandeja asistida (su canal no envía solo).
+  await dispatchQuietly(supabase);
+
+  revalidateNotificaciones();
+  return {
+    ok: true as const,
+    recipientCount: result.recipients,
+    queuedEmail: result.queuedEmail,
+    queuedWhatsapp: result.queuedWhatsapp,
+    skipped: result.skipped,
+  };
 }

@@ -2,13 +2,17 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildUnsubscribeNote,
+  renderCampaignMessage,
   renderTemplate,
 } from './templates';
 import type {
+  Campaign,
+  CampaignRecipient,
   NotificationChannel,
   NotificationEvent,
   NotificationRecipientKind,
   NotificationSettings,
+  NotificationStatus,
   NotificationTemplate,
   TemplateVars,
 } from './types';
@@ -113,15 +117,87 @@ export interface EnqueueInput {
 }
 
 /**
- * Encola un lote. Descarta en silencio lo que no se puede mandar (plantilla
- * apagada o inexistente, destinatario sin correo/teléfono) — son situaciones
- * normales, no errores: una clienta puede no haber dado su correo.
+ * ¿Falta el dato del destinatario para este canal? Devuelve el motivo en
+ * español, o `null` si se puede mandar.
+ *
+ * ESTE ES EL CORAZÓN DE LA TRAZABILIDAD. Antes, cuando faltaba el correo, el
+ * encolado devolvía `[]` y no quedaba NINGÚN rastro: en producción el outbox
+ * tenía 2 filas, las dos de WhatsApp, y parecía que el correo estaba roto.
+ * No lo estaba — 40 de las 59 clientas no tienen correo (es opcional en
+ * /reservar) y esos mensajes nunca existieron. Ahora la fila se encola igual
+ * con `status = 'OMITIDO'` y este texto en `error`.
+ *
+ * El mismo motivo lo reusa `retryNotification` para no dejar colgada en
+ * PENDIENTE una fila que se reintenta y sigue sin destinatario.
+ */
+export function missingRecipientReason(
+  channel: NotificationChannel,
+  recipientKind: NotificationRecipientKind,
+  toEmail: string | null,
+  toPhone: string | null,
+): string | null {
+  if (channel === 'email' && !toEmail) {
+    return recipientKind === 'admin'
+      ? 'No hay correo de avisos configurado (Notificaciones → Ajustes generales).'
+      : 'La clienta no tiene correo registrado.';
+  }
+  if (channel === 'whatsapp' && !toPhone) {
+    return recipientKind === 'admin'
+      ? 'No hay WhatsApp de avisos configurado (Notificaciones → Ajustes generales).'
+      : 'La clienta no tiene teléfono registrado.';
+  }
+  return null;
+}
+
+/** Tope de filas por `upsert`. Una campaña puede encolar decenas de destinatarias. */
+const INSERT_CHUNK_SIZE = 200;
+
+/**
+ * Inserta en lote, de a `INSERT_CHUNK_SIZE`. Nunca lanza: encolar es un
+ * efecto secundario y no puede tumbar la operación que lo disparó (una
+ * reserva, por ejemplo). Devuelve `false` si algún lote falló.
+ */
+async function insertNotificationRows(
+  supabase: NotificationsClient,
+  rows: Record<string, unknown>[],
+): Promise<boolean> {
+  let ok = true;
+
+  for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + INSERT_CHUNK_SIZE);
+    // `ignoreDuplicates` = `on conflict (dedupe_key) do nothing`: ESA es la
+    // idempotencia, no este código.
+    const { error } = await supabase
+      .from('notifications')
+      .upsert(chunk, { onConflict: 'dedupe_key', ignoreDuplicates: true });
+
+    if (error) {
+      console.error('[notificaciones] no se pudo encolar', error.message);
+      ok = false;
+    }
+  }
+
+  return ok;
+}
+
+/**
+ * Encola un lote.
+ *
+ * Lo que NO se puede mandar por falta de datos del destinatario se encola
+ * igual como OMITIDO, con el motivo escrito (ver `missingRecipientReason`):
+ * una fila OMITIDO no la despacha el worker (solo consulta PENDIENTE) ni
+ * aparece en la bandeja de WhatsApp (filtra PENDIENTE), pero sí queda en el
+ * historial, que es todo el punto.
+ *
+ * Lo que sí se descarta en silencio es la plantilla apagada o inexistente:
+ * apagar una plantilla es una decisión deliberada de Manu, y dejar rastro de
+ * cada mensaje que ella eligió no mandar solo ensuciaría el historial.
  */
 export async function enqueueNotifications(
   supabase: NotificationsClient,
   context: NotificationContext,
   inputs: EnqueueInput[],
-): Promise<{ enqueued: number }> {
+): Promise<{ enqueued: number; skipped: number }> {
   const rows = inputs.flatMap((input) => {
     const template = findTemplate(
       context,
@@ -133,9 +209,16 @@ export async function enqueueNotifications(
 
     const toEmail = input.toEmail?.trim() || null;
     const toPhone = input.toPhone?.trim() || null;
-    if (input.channel === 'email' && !toEmail) return [];
-    if (input.channel === 'whatsapp' && !toPhone) return [];
+    const missing = missingRecipientReason(
+      input.channel,
+      input.recipientKind,
+      toEmail,
+      toPhone,
+    );
 
+    // El cuerpo se renderiza igual aunque falte el destinatario: así, si Manu
+    // agrega el correo de la clienta y le da "Reintentar", el mensaje ya está
+    // escrito tal como se habría mandado ese día.
     const rendered = renderTemplate(template, input.vars, {
       businessName: context.businessName,
       footerNote: input.footerNote,
@@ -153,27 +236,21 @@ export async function enqueueNotifications(
         appointment_id: input.appointmentId ?? null,
         subject: rendered.subject,
         body: rendered.body,
-        status: 'PENDIENTE',
+        status: (missing ? 'OMITIDO' : 'PENDIENTE') satisfies NotificationStatus,
+        error: missing,
         scheduled_for: (input.scheduledFor ?? new Date()).toISOString(),
         dedupe_key: input.dedupeKey,
       },
     ];
   });
 
-  if (rows.length === 0) return { enqueued: 0 };
+  if (rows.length === 0) return { enqueued: 0, skipped: 0 };
 
-  const { error } = await supabase
-    .from('notifications')
-    .upsert(rows, { onConflict: 'dedupe_key', ignoreDuplicates: true });
+  const ok = await insertNotificationRows(supabase, rows);
+  if (!ok) return { enqueued: 0, skipped: 0 };
 
-  if (error) {
-    // No se propaga: encolar es un efecto secundario, nunca puede tumbar
-    // la operación de negocio que lo disparó (una reserva, por ejemplo).
-    console.error('[notificaciones] no se pudo encolar', error.message);
-    return { enqueued: 0 };
-  }
-
-  return { enqueued: rows.length };
+  const skipped = rows.filter((row) => row.status === 'OMITIDO').length;
+  return { enqueued: rows.length - skipped, skipped };
 }
 
 // ---------------------------------------------------------------------------
@@ -348,4 +425,111 @@ export async function enqueueBirthday(
       dedupeKey: `birthday:${input.clientId}:${input.year}:client:whatsapp`,
     },
   ]);
+}
+
+// ---------------------------------------------------------------------------
+// Campañas (migración 0017)
+// ---------------------------------------------------------------------------
+
+export interface EnqueueCampaignResult {
+  /** Destinatarias con AL MENOS un mensaje encolable. Es lo que va a `recipient_count`. */
+  recipients: number;
+  /** Filas PENDIENTE de correo (las manda el despachador solo). */
+  queuedEmail: number;
+  /** Filas PENDIENTE de WhatsApp (quedan en la bandeja asistida). */
+  queuedWhatsapp: number;
+  /** Filas OMITIDO por falta de correo/teléfono, con el motivo en el historial. */
+  skipped: number;
+  /** `false` si algún lote no se pudo insertar (el motivo queda en el log). */
+  ok: boolean;
+}
+
+/**
+ * Encola una campaña: una fila de `notifications` por destinataria y canal.
+ *
+ * Reusa el outbox en vez de mandar desde acá, igual que todo lo demás del
+ * módulo. Así hereda gratis el despachador, el claim atómico, el historial y
+ * —lo más importante— el `dedupe_key`: `campaign:<id>:<clienta>:<canal>`
+ * garantiza que una campaña no le llegue dos veces a la misma persona aunque
+ * el envío se dispare de nuevo.
+ *
+ * El correo sale solo (el despachador lo toma). El WhatsApp queda PENDIENTE
+ * en la bandeja asistida, como todo el WhatsApp del proyecto.
+ *
+ * TODO en un solo `upsert` por lote de 200: una campaña a 60 clientas por dos
+ * canales son 120 filas, y hacer un round-trip por destinataria sería
+ * absurdo.
+ *
+ * OJO — LEY 1581: esta función NO filtra `marketing_opt_out`. Eso ya lo hizo
+ * la función SQL `campaign_audience` que produjo `recipients`; duplicar el
+ * filtro acá solo escondería el día que alguien llame con otra lista.
+ */
+export async function enqueueCampaign(
+  supabase: NotificationsClient,
+  context: NotificationContext,
+  campaign: Pick<Campaign, 'id' | 'subject' | 'body' | 'flyer_image_url' | 'channels'>,
+  recipients: CampaignRecipient[],
+): Promise<EnqueueCampaignResult> {
+  const result: EnqueueCampaignResult = {
+    recipients: 0,
+    queuedEmail: 0,
+    queuedWhatsapp: 0,
+    skipped: 0,
+    ok: true,
+  };
+
+  const scheduledFor = new Date().toISOString();
+  const rows: Record<string, unknown>[] = [];
+
+  for (const recipient of recipients) {
+    const toEmail = recipient.email?.trim() || null;
+    const toPhone = recipient.phone?.trim() || null;
+    let reachable = false;
+
+    for (const channel of campaign.channels) {
+      const missing = missingRecipientReason(channel, 'client', toEmail, toPhone);
+
+      const rendered = renderCampaignMessage(campaign, channel, {
+        cliente: recipient.name,
+        negocio: context.businessName,
+        telefono: context.publicPhone,
+      }, {
+        businessName: context.businessName,
+        logoUrl: context.emailLogoUrl,
+        unsubscribeContact: context.publicEmail,
+      });
+
+      if (missing) {
+        result.skipped += 1;
+      } else {
+        reachable = true;
+        if (channel === 'email') result.queuedEmail += 1;
+        else result.queuedWhatsapp += 1;
+      }
+
+      rows.push({
+        event: 'campaign' satisfies NotificationEvent,
+        channel,
+        recipient_kind: 'client' satisfies NotificationRecipientKind,
+        to_email: channel === 'email' ? toEmail : null,
+        to_phone: channel === 'whatsapp' ? toPhone : null,
+        client_id: recipient.id,
+        appointment_id: null,
+        campaign_id: campaign.id,
+        subject: rendered.subject,
+        body: rendered.body,
+        status: (missing ? 'OMITIDO' : 'PENDIENTE') satisfies NotificationStatus,
+        error: missing,
+        scheduled_for: scheduledFor,
+        dedupe_key: `campaign:${campaign.id}:${recipient.id}:${channel}`,
+      });
+    }
+
+    if (reachable) result.recipients += 1;
+  }
+
+  if (rows.length === 0) return result;
+
+  result.ok = await insertNotificationRows(supabase, rows);
+  return result;
 }

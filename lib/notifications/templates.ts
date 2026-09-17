@@ -138,15 +138,44 @@ ${bodyHtml}
 }
 
 /**
- * Nota de baja del correo de cumpleaños. Es marketing (Ley 1581 de 2012), no
- * transaccional: tiene que ofrecer cómo darse de baja. Manu marca el
- * `marketing_opt_out` de la clienta desde su ficha en /admin/clientes.
+ * Qué se ofrece dejar de recibir. Son literales del código (no entran valores
+ * de ningún formulario), por eso no se escapan.
  */
-export function buildUnsubscribeNote(contact: string): string {
-  const safe = escapeHtml(contact || '');
-  return safe
-    ? `¿Prefieres no recibir estos saludos? Escríbenos a ${safe} y te damos de baja.`
-    : '¿Prefieres no recibir estos saludos? Respóndenos este correo y te damos de baja.';
+type UnsubscribeSubject = 'estos saludos' | 'estas promociones';
+
+function unsubscribeSentence(
+  contact: string,
+  what: UnsubscribeSubject,
+  replyTarget: 'este correo' | 'este mensaje',
+): string {
+  return contact
+    ? `¿Prefieres no recibir ${what}? Escríbenos a ${contact} y te damos de baja.`
+    : `¿Prefieres no recibir ${what}? Respóndenos ${replyTarget} y te damos de baja.`;
+}
+
+/**
+ * Nota de baja para el PIE DE UN CORREO (va dentro del HTML, por eso escapa
+ * el contacto). Es marketing (Ley 1581 de 2012), no transaccional: tiene que
+ * ofrecer cómo darse de baja. La usan el saludo de cumpleaños y las campañas.
+ * Manu marca el `marketing_opt_out` de la clienta desde su ficha en
+ * /admin/clientes.
+ */
+export function buildUnsubscribeNote(
+  contact: string,
+  what: UnsubscribeSubject = 'estos saludos',
+): string {
+  return unsubscribeSentence(escapeHtml(contact || ''), what, 'este correo');
+}
+
+/**
+ * La misma nota, en TEXTO PLANO, para el mensaje de WhatsApp de una campaña.
+ * No se escapa: iría al link `wa.me` con los `&amp;` literales a la vista.
+ */
+export function buildUnsubscribeText(
+  contact: string,
+  what: UnsubscribeSubject = 'estas promociones',
+): string {
+  return unsubscribeSentence(contact || '', what, 'este mensaje');
 }
 
 /**
@@ -180,6 +209,72 @@ export function renderTemplate(
     businessName: options?.businessName ?? vars.negocio ?? 'Centro Estético Manuj',
     footerNote: options?.footerNote,
     logoUrl: options?.logoUrl,
+  });
+
+  return { subject, body, text };
+}
+
+/**
+ * Renderiza el mensaje de una CAMPAÑA. No pasa por `notification_templates`:
+ * cada campaña trae su propio asunto y cuerpo (ver `campaigns` en 0017).
+ *
+ * Las dos diferencias con `renderTemplate`, y por qué:
+ *
+ * 1. EL FLYER. En correo se **embebe** como `<img>` arriba del texto. En
+ *    WhatsApp no se puede adjuntar nada desde un deep link `wa.me`, así que
+ *    va el **link público** al final del mensaje y WhatsApp arma la vista
+ *    previa solo. El flyer tiene que ser PNG/JPG: ningún cliente de correo
+ *    mayoritario renderiza SVG dentro de un `<img>` (lo validan las Server
+ *    Actions y `uploadSiteMedia`).
+ *
+ * 2. LA LÍNEA DE BAJA, siempre, en los dos canales. Una campaña es marketing
+ *    (Ley 1581 de 2012), como el saludo de cumpleaños.
+ *
+ * Se mantiene intacto lo que sí comparte: los valores interpolados se escapan
+ * como HTML en el correo, y al asunto se le limpian los CR/LF.
+ */
+export function renderCampaignMessage(
+  campaign: {
+    subject: string | null;
+    body: string;
+    flyer_image_url: string | null;
+  },
+  channel: NotificationChannel,
+  vars: TemplateVars,
+  options: {
+    businessName: string;
+    logoUrl?: string | null;
+    /** Contacto al que se escribe para darse de baja (correo público del centro). */
+    unsubscribeContact: string;
+  },
+): RenderedMessage {
+  const text = interpolate(campaign.body, vars, (v) => v);
+
+  if (channel === 'whatsapp') {
+    const parts = [text];
+    if (campaign.flyer_image_url) parts.push(campaign.flyer_image_url);
+    parts.push(buildUnsubscribeText(options.unsubscribeContact, 'estas promociones'));
+    const whatsappBody = parts.join('\n\n');
+    return { subject: null, body: whatsappBody, text: whatsappBody };
+  }
+
+  const subject = campaign.subject
+    ? sanitizeHeaderValue(interpolate(campaign.subject, vars, sanitizeHeaderValue))
+    : null;
+
+  // `max-width` en línea y `width:100%`: es lo único que hace que el flyer no
+  // se desborde en el móvil en los clientes que ignoran el CSS de `<head>`.
+  const flyerHtml = campaign.flyer_image_url
+    ? `<img src="${escapeHtml(campaign.flyer_image_url)}" alt="${escapeHtml(options.businessName)}"
+             style="display:block;border:0;outline:none;text-decoration:none;width:100%;max-width:504px;height:auto;border-radius:8px;margin:0 0 20px;" />`
+    : '';
+
+  const escapedBody = interpolate(campaign.body, vars, escapeHtml);
+  const body = buildEmailHtml({
+    bodyHtml: `${flyerHtml}\n${textToHtmlParagraphs(escapedBody)}`,
+    businessName: options.businessName,
+    footerNote: buildUnsubscribeNote(options.unsubscribeContact, 'estas promociones'),
+    logoUrl: options.logoUrl,
   });
 
   return { subject, body, text };
@@ -226,12 +321,15 @@ export const EVENT_VARIABLES: Record<NotificationEvent, TemplateVariable[]> = {
     VAR_TELEFONO_CLIENTE,
   ],
   birthday: [VAR_CLIENTE, VAR_NEGOCIO, VAR_TELEFONO, VAR_TELEFONO_CLIENTE],
+  // Una campaña no sabe de citas: no tiene servicio, ni fecha, ni hora.
+  campaign: [VAR_CLIENTE, VAR_NEGOCIO, VAR_TELEFONO],
 };
 
 export const EVENT_LABELS: Record<NotificationEvent, string> = {
   booking_requested: 'Nueva solicitud de cita',
   appointment_reminder: 'Recordatorio de cita',
   birthday: 'Saludo de cumpleaños',
+  campaign: 'Campaña / promoción',
 };
 
 export const EVENT_DESCRIPTIONS: Record<NotificationEvent, string> = {
@@ -241,6 +339,8 @@ export const EVENT_DESCRIPTIONS: Record<NotificationEvent, string> = {
     'Lo encola el proceso diario para las citas CONFIRMADAS del día siguiente (según la antelación configurada).',
   birthday:
     'Lo encola el proceso diario, el día del mes configurado, para las clientas que cumplen años ese mes. Respeta a quienes pidieron no recibir marketing.',
+  campaign:
+    'Envío masivo con flyer que se dispara a mano desde la pestaña Campañas. No usa plantilla: cada campaña trae su propio texto. Respeta a quienes pidieron no recibir marketing.',
 };
 
 export const CHANNEL_LABELS: Record<NotificationChannel, string> = {
@@ -262,4 +362,11 @@ export const PREVIEW_VARS: TemplateVars = {
   negocio: 'Centro Estético Manuj',
   telefono: '+57 321 548 7690',
   telefono_cliente: '+57 300 123 4567',
+};
+
+/** Valores de ejemplo para la vista previa de una campaña. */
+export const CAMPAIGN_PREVIEW_VARS: TemplateVars = {
+  cliente: PREVIEW_VARS.cliente,
+  negocio: PREVIEW_VARS.negocio,
+  telefono: PREVIEW_VARS.telefono,
 };
