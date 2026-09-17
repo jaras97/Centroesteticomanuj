@@ -7,7 +7,14 @@
 export type NotificationEvent =
   | 'booking_requested'
   | 'appointment_reminder'
-  | 'birthday';
+  | 'birthday'
+  /**
+   * Envío masivo con flyer que Manu dispara a mano desde el panel (no lo
+   * produce ningún evento del negocio). Es el único evento cuyo texto NO sale
+   * de `notification_templates`: cada campaña trae su propio asunto y cuerpo.
+   * Ver `campaigns` en 0017_campanas.sql.
+   */
+  | 'campaign';
 
 export type NotificationChannel = 'email' | 'whatsapp';
 
@@ -36,6 +43,8 @@ export interface Notification {
   to_phone: string | null;
   client_id: string | null;
   appointment_id: string | null;
+  /** De qué campaña salió este mensaje (`null` en todo lo transaccional). */
+  campaign_id: string | null;
   subject: string | null;
   /** Ya renderizado, con las variables resueltas. */
   body: string;
@@ -118,4 +127,85 @@ export interface NotificationChannelAdapter {
    */
   readonly sendsAutomatically: boolean;
   send(notification: Notification): Promise<ChannelSendResult>;
+}
+
+// ---------------------------------------------------------------------------
+// Campañas (migración 0017)
+// ---------------------------------------------------------------------------
+
+/**
+ * Segmento de una campaña. Es el contenido de `campaigns.audience` (jsonb) y
+ * lo resuelve `lib/notifications/audience.ts` contra Postgres.
+ *
+ * Discriminado por `kind` a propósito: cada segmento tiene parámetros
+ * distintos, y con columnas sueltas la mitad quedaría siempre en null.
+ *
+ * NINGÚN segmento incluye jamás a una clienta con `marketing_opt_out = true`:
+ * la exclusión vive en la función SQL `campaign_audience`, no en quien la
+ * llama, para que no se pueda olvidar (Ley 1581 de 2012).
+ */
+export type CampaignAudience =
+  /** Todas las clientas registradas. */
+  | { kind: 'all' }
+  /** Las que cumplen años en el mes `month` (1-12). */
+  | { kind: 'birthday_month'; month: number }
+  /** Sin ninguna cita COMPLETADA en los últimos `months` meses. */
+  | { kind: 'inactive'; months: number }
+  /** Su PRIMERA cita COMPLETADA cae dentro de los últimos `months` meses. */
+  | { kind: 'new'; months: number }
+  /** Selección a mano desde el panel. */
+  | { kind: 'manual'; clientIds: string[] };
+
+export type CampaignAudienceKind = CampaignAudience['kind'];
+
+/**
+ * `BORRADOR` se edita y se borra; `ENVIADA` es histórico y no admite ninguna
+ * de las dos cosas (lo impiden las Server Actions).
+ */
+export type CampaignStatus = 'BORRADOR' | 'ENVIADA';
+
+/** Fila de la tabla `campaigns`. */
+export interface Campaign {
+  id: string;
+  /** Nombre interno, para reconocerla en la lista. No se le manda a nadie. */
+  title: string;
+  /** Asunto del correo. Obligatorio si `channels` incluye 'email'. */
+  subject: string | null;
+  /** Texto del mensaje. Admite las mismas variables `{{...}}` que las plantillas. */
+  body: string;
+  /** PNG/JPG en Storage (`site-media`, carpeta `campaigns/`). Nunca SVG. */
+  flyer_image_url: string | null;
+  channels: NotificationChannel[];
+  audience: CampaignAudience;
+  status: CampaignStatus;
+  sent_at: string | null;
+  /**
+   * Alcance REAL, no tamaño del segmento: destinatarias que quedaron con al
+   * menos un mensaje encolable (PENDIENTE). Una clienta sin correo, en una
+   * campaña que iba solo por correo, no suma acá — su fila queda OMITIDO en
+   * el outbox con el motivo.
+   */
+  recipient_count: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Lo que devuelve `getCampaignAudienceStats` (y `previewCampaignAudience`). */
+export interface CampaignAudienceStats {
+  /** Destinatarias del segmento, YA descontadas las que pidieron no recibir marketing. */
+  total: number;
+  /** De esas, cuántas tienen correo registrado. */
+  reachableByEmail: number;
+  /** De esas, cuántas tienen teléfono registrado. */
+  reachableByWhatsapp: number;
+  /** Cuántas quedaron fuera por `marketing_opt_out` (dato para mostrar, no para sumar). */
+  excludedByOptOut: number;
+}
+
+/** Una destinataria ya resuelta, lista para encolar. */
+export interface CampaignRecipient {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
 }
